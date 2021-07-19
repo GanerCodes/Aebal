@@ -1,8 +1,4 @@
 import java.io.File;
-import java.awt.AWTException;
-import java.awt.MouseInfo;
-import java.awt.Point;
-import java.awt.Robot;
 import ddf.minim.*;
 import ddf.minim.analysis.*;
 
@@ -13,12 +9,6 @@ float GAIN = -15;
 float titleScroll = 0;
 
 String gameState = "gameSelect";
-
-void resetToCenter() {
-  mm.mouseMove(width / 2, height / 2);
-  posX = width / 2;
-  posY = height / 2;
-}
 
 float findComplexity(float[] k) {
   float adv = 0;
@@ -72,8 +62,10 @@ Float[] generateLoc(float d) {
 
 class field {
   float size;
+  boolean isOutside;
   field(float size) {
     this.size = size;
+    this.isOutside = false;
   }
   void draw() {
     rectMode(CENTER);
@@ -84,20 +76,9 @@ class field {
   }
   void update() {
     float mn = size / 2 - 10 - 5;
-    float PX = posX;
-    float PY = posY;
-    posX = constrain(posX, max(width  / 2 - mn, 15), min(width  / 2 + mn, width  - 15));
-    posY = constrain(posY, max(height / 2 - mn, 15), min(height / 2 + mn, height - 15));
-    Point p = MouseInfo.getPointerInfo().getLocation(); 
-    if (PX != posX || PY != posY) {
-      mm.mouseMove(int(posX), int(posY));
-    }
-    if (p.x > width || p.x < 0) {
-      mm.mouseMove(constrain(p.x, 1, width - 1), p.y);
-    }
-    if (p.y > height || p.y < 0) {
-      mm.mouseMove(p.x, constrain(p.y, 1, height - 1));
-    }
+    posX = constrain(mouseX, max(width  / 2 - mn, 15), min(width  / 2 + mn, width  - 15));
+    posY = constrain(mouseY, max(height / 2 - mn, 15), min(height / 2 + mn, height - 15));
+    isOutside = mouseX != posX || mouseY != posY;
   }
 }
 
@@ -189,8 +170,8 @@ class arrow {
         noScoreTimer = 60;
         hitSound.play();
         hitSound.rewind();
-        for (int i = objs.size() - 1; i > -1; i--) {
-          objs.get(i).timer = 0;
+        for (obj o : objs) {
+          o.timer = 0;
         }
       }
     }
@@ -251,23 +232,17 @@ class obj {
 
     if (x > posX - 20 && x < posX + 20 && y > posY - 20 && y < posY + 20) {
       score -= getOnScreenObjCount();
+      noScoreTimer = 30;
       hitSound.play();
       hitSound.rewind();
-      for (int i = objs.size() - 1; i > -1; i--) {
-        objs.get(i).timer = 0;
+      for (obj o : objs) {
+        o.timer = 0;
       }
     }
   }
   void draw() {
     back.noStroke();
-    if(intense) {
-      // colorMode(HSB);
-      back.colorMode(HSB);
-      back.fill(globalObjHue, 128, 255);
-      // colorMode(RGB);
-    }else{
-      back.fill(255, 0, 0);
-    }
+    back.fill(globalObjColor);
     back.ellipse(x, y, 20, 20);
   }
 }
@@ -286,13 +261,12 @@ PGraphics back, back2;
 PShader bubbleShader;
 ArrayList<obj> objs = new ArrayList();
 ArrayList<bubble> bubbles = new ArrayList();
-Robot mm;
 field f;
 arrow a;
 
-//Vars to avoid recalculations
-float globalObjHue;
-
+//Vars to save or avoid recalculations
+float randTransX, randTransY;
+color globalObjColor;
 
 void setup() {
   minim = new Minim(this);
@@ -303,8 +277,9 @@ void setup() {
   songList = new File(dataPath("songs")).list();
 
   fullScreen(P2D);
-  smooth(4);
   frameRate(FPS);
+  smooth(4);
+  
   back  = createGraphics(width, height, P2D);
   back2 = createGraphics(width, height, P2D);
   strokeCap(PROJECT);
@@ -312,12 +287,6 @@ void setup() {
   
   f = new field(max(width, height));
 
-  try {
-    mm = new Robot();
-  } catch (AWTException e) {
-    // Java moment
-  }
-  resetToCenter();
   randomSeed(0);
   
   a = new arrow(width / 2, height / 2, 0, 500, 1700);
@@ -335,40 +304,41 @@ void draw() {
       rectMode(CORNER);
       textSize(14);
       background(0);
+      int expandSize = 150;
       float sc = width / 10.0;
       float dd = (width - (9 * sc + 100)) / 2;
       for(int i = 0; i < songList.length; i++) {
         int x = int((i % 10) * sc + dd);
         int y = int((i / 10) * sc + dd);
-        boolean inside = mouseX > x && mouseX < x + 100 && mouseY > y + titleScroll && mouseY < y + titleScroll + 100;
+        boolean inside = mouseX > x && mouseX < x + expandSize && mouseY > y + titleScroll && mouseY < y + titleScroll + expandSize;
         pushMatrix();
         translate(0, titleScroll);
         fill(inside ? 200 : 100);
         stroke(255);
         strokeWeight(4);
-        rect(x, y, 100, 100, 15);
+        rect(x, y, expandSize, expandSize, 15);
         fill(0);
         textAlign(CENTER);
-        text(songList[i], x + 7.5, y + 7.5, 85, 85);
+        text(songList[i], x + 5, y + 5, expandSize - 7, expandSize - 7);
         if(mousePressed && inside) {
           gameState = "game";
-          
           song =  minim.loadFile("songs/" + songList[i]);
-          song.setGain(GAIN);
-          song.play();
-          fft = new FFT(song.bufferSize(), song.sampleRate());
-          
-          textAlign(LEFT);
-          noCursor();
-          rectMode(CENTER);
         }
         popMatrix();
+      }
+      if(gameState.equals("game")) {
+        song.setGain(GAIN);
+        song.play();
+        fft = new FFT(song.bufferSize(), song.sampleRate());
+        
+        textAlign(LEFT);
+        noCursor();
+        rectMode(CENTER);
       }
       break;
     case "game":
       fft.forward(song.mix);
-      float preCalcC = findComplexity(song.mix.toArray());
-      c = preCalcC * (targetComplexity / songComplexity) * (0.65 + song.mix.level());
+      c = findComplexity(song.mix.toArray()) * (targetComplexity / songComplexity) * (0.65 + song.mix.level());
       noScoreTimer -= (60 / frameRate);
       objSpawnTimer -= c * 2 * (60 / frameRate);
     
@@ -444,7 +414,8 @@ void draw() {
             objs.remove(i);
           }
         }
-        
+        randTransX = random(10 * -c, 10 * c);
+        randTransY = random(10 * -c, 10 * c);
         ang += 0.001 + constrain(c / 75, 0, 0.05);
         a.speed *= 1 + constrain((c - targetComplexity) / 100, -0.05, 0.05);
         a.speed = constrain(a.speed, 0.5, 1.75);
@@ -479,7 +450,10 @@ void draw() {
       back.stroke(255);
       back.strokeWeight(5);
       back.line(posX, posY, pX, pY);
-      globalObjHue = int((0.1 + c + 2 * pow(1.7 * c, 5.0)) *  225.0 * millis() / 500.0) % 255;
+      colorMode(HSB);
+
+      globalObjColor = lerpColor(globalObjColor, intense ? color((millis() / 5.0) % 255, 128, 255) : color(0, 255, 255), 4.0 / frameRate);
+
       for(obj o : objs) {
         o.draw();
       }
@@ -496,24 +470,26 @@ void draw() {
       noStroke();
       fill(255);
       rect(posX, posY, 20, 20);
+      if(f.isOutside) {
+        colorMode(RGB);
+        fill(255, 0, 0);
+        rect(mouseX, mouseY, 10, 10);
+      }
       pushMatrix();
       if (intense) { //Add physics tick conditional here?
-        translate(random(10 * -c, 10 * c), random(10 * -c, 10 * c));
+        translate(randTransX, randTransY);
       }
       strokeWeight(10);
       stroke(255);
       f.draw();
       popMatrix();
-    
-      if (frameCount == 1) {
-        resetToCenter();
-      }
       
       textSize(50);
       colorMode(HSB);
       fill(200, 255, 255);
       score = max(0, score);
-      text("Score: " + score, 115, 55);
+      textAlign(LEFT, TOP);
+      text("Score: " + score + "\nComplexity: " + songComplexity + "\nIntensity: " + round(c * 100) + "\nFPS: " + round(frameRate), 10, 10);
       break;
   }
 }
