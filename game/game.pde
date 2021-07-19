@@ -147,9 +147,9 @@ class bubble {
   }
   void draw() {
     effect.beginDraw();
-    bubbleShader.set("clr", max(1, 1 * c));
+    bubbleShader.set("clr", 1.2 * (pow(c, 0.33)));
     bubbleShader.set("mul", c / 5.0);
-    bubbleShader.set("opacity", 0.01 + c / 120.0);
+    bubbleShader.set("opacity", 0.001 + pow(c, 0.75) / 35.0);
     bubbleShader.set("u_time", millis() / 1000.0);
     effect.endDraw();
     effect.filter(bubbleShader);
@@ -260,37 +260,47 @@ class obj {
   }
   void draw() {
     back.noStroke();
-    back.fill(255, 0, 0);
+    if(intense) {
+      // colorMode(HSB);
+      back.colorMode(HSB);
+      back.fill(globalObjHue, 128, 255);
+      // colorMode(RGB);
+    }else{
+      back.fill(255, 0, 0);
+    }
     back.ellipse(x, y, 20, 20);
   }
 }
 
-float posX, posY, c, adv, count, objSpawnTimer, ang;
-int score = 0;
-ArrayList<obj> objs = new ArrayList();
-ArrayList<bubble> bubbles = new ArrayList();
-PGraphics back, back2;
-PShader bubbleShader;
-field f;
-Robot mm;
 
-AudioPlayer song;
-AudioPlayer hitSound;
+
+//General vars
+boolean intense = false;
+int score = 0;
+float posX, posY, c, adv, count, objSpawnTimer, ang, noScoreTimer = 0;
+String[] songList;
+AudioPlayer song, hitSound;
 Minim minim;
 FFT fft;
-
+PGraphics back, back2;
+PShader bubbleShader;
+ArrayList<obj> objs = new ArrayList();
+ArrayList<bubble> bubbles = new ArrayList();
+Robot mm;
+field f;
 arrow a;
+
+//Vars to avoid recalculations
+float globalObjHue;
+
+
 void setup() {
   minim = new Minim(this);
   hitSound = minim.loadFile("hit.wav");
   hitSound.setGain(-3);
   
-  String songTmp = sketchPath("data\\songsTmp.txt");
-  launch("wmic process where name='javaw.exe' get ExecutablePath >> " + songTmp);
   delay(100);
   songList = new File(dataPath("songs")).list();
-  print(join(loadStrings(songTmp), " | "));
-  new File(songTmp).delete();
 
   fullScreen(P2D);
   smooth(4);
@@ -304,7 +314,9 @@ void setup() {
 
   try {
     mm = new Robot();
-  } catch (AWTException e) {}
+  } catch (AWTException e) {
+    // Java moment
+  }
   resetToCenter();
   randomSeed(0);
   
@@ -315,10 +327,6 @@ void setup() {
     bubbles.add(new bubble(random(0, width), random(0, height)));
   }
 }
-
-float noScoreTimer = 0;
-int preScore;
-String[] songList;
 
 void draw() {
   switch(gameState) {
@@ -373,9 +381,9 @@ void draw() {
       f.update();
     
       color backColor;
-      boolean H = false;
+      intense = false;
       if (f.size <= 505) {
-        H = true;
+        intense = true;
         colorMode(HSB);
         backColor = color((100 + (c * 500)) % 255, 255, (c - 0.25) * 200);
       } else {
@@ -460,7 +468,7 @@ void draw() {
       
       back.beginDraw();
       back.noStroke();
-      back.colorMode(H ? HSB : RGB);
+      back.colorMode(intense ? HSB : RGB);
       back.fill(backColor, 50 * (60 / frameRate) + 1);
       back.rect(-5, -5, width + 10, height + 10);
       back.colorMode(RGB);
@@ -471,6 +479,7 @@ void draw() {
       back.stroke(255);
       back.strokeWeight(5);
       back.line(posX, posY, pX, pY);
+      globalObjHue = int((0.1 + c + 2 * pow(1.7 * c, 5.0)) *  225.0 * millis() / 500.0) % 255;
       for(obj o : objs) {
         o.draw();
       }
@@ -488,7 +497,7 @@ void draw() {
       fill(255);
       rect(posX, posY, 20, 20);
       pushMatrix();
-      if (H) { //Add physics tick conditional here?
+      if (intense) { //Add physics tick conditional here?
         translate(random(10 * -c, 10 * c), random(10 * -c, 10 * c));
       }
       strokeWeight(10);
