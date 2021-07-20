@@ -1,3 +1,6 @@
+import ch.bildspur.postfx.builder.*;
+import ch.bildspur.postfx.pass.*;
+import ch.bildspur.postfx.*;
 import java.io.File;
 import ddf.minim.*;
 import ddf.minim.analysis.*;
@@ -259,6 +262,7 @@ Minim minim;
 FFT fft;
 PGraphics back, back2;
 PShader bubbleShader;
+PostFX postProcessing;
 ArrayList<obj> objs = new ArrayList();
 ArrayList<bubble> bubbles = new ArrayList();
 field f;
@@ -276,12 +280,13 @@ void setup() {
   delay(100);
   songList = new File(dataPath("songs")).list();
 
-  fullScreen(P2D);
+  fullScreen(P2D, 3);
   frameRate(FPS);
   smooth(4);
   
   back  = createGraphics(width, height, P2D);
   back2 = createGraphics(width, height, P2D);
+  postProcessing = new PostFX(this);
   strokeCap(PROJECT);
   textFont(createFont("font.ttf", 64));
   
@@ -452,7 +457,7 @@ void draw() {
       back.line(posX, posY, pX, pY);
       colorMode(HSB);
 
-      globalObjColor = lerpColor(globalObjColor, intense ? color((millis() / 5.0) % 255, 128, 255) : color(0, 255, 255), 4.0 / frameRate);
+      globalObjColor = lerpColor(globalObjColor, intense ? color((millis() / 5.0) % 255, 164, 255) : color(0, 255, 255), 4.0 / frameRate);
 
       for(obj o : objs) {
         o.draw();
@@ -484,6 +489,13 @@ void draw() {
       f.draw();
       popMatrix();
       
+      PostFXBuilder builder = postProcessing.render().bloom(0.5, 20, 40);
+      if(intense) {
+        builder.rgbSplit(c * 50.0).saturationVibrance(0.4 + c / 3.0, 0.4 + c / 3.0);
+        // .chromaticAberration();
+      }
+      builder.compose(); //post processing
+
       textSize(50);
       colorMode(HSB);
       fill(200, 255, 255);
