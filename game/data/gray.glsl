@@ -1,4 +1,4 @@
-//Yoinked from https://gamedev.stackexchange.com/questions/59797/glsl-shader-change-hue-saturation-brightness
+// Yoinked from https://gamedev.stackexchange.com/questions/59797/glsl-shader-change-hue-saturation-brightness
 
 #ifdef GL_ES
 precision mediump float;
