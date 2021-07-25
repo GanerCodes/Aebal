@@ -17,6 +17,7 @@ boolean DO_POST_PROCESSING       = true;
 boolean BACKGROUND_FADE          = true;
 boolean DYNAMIC_BACKGROUND_COLOR = true;
 boolean DO_OBJ_RESET             = true;
+boolean DO_SHAKE                 = true;
 
 String gameState = "gameSelect";
 
@@ -96,6 +97,7 @@ class field {
 class bubble {
   PVector loc, vel;
   PGraphics effect;
+  float timer_offset;
   int size = 1000;
   bubble(PVector loc) {
     effect = createGraphics(size, size, P2D);
@@ -104,6 +106,7 @@ class bubble {
       PVector.random2D().mult(random(1.5, 2.5)),
       vec2(rSign(), rSign())
     );
+    timer_offset = random(0, 1000000);
   }
   void update() {
     loc.add(PVector.mult(vel, max(0.01, pow(2 * max(0.01, c - 0.08), 3))));
@@ -126,7 +129,7 @@ class bubble {
     bubbleShader.set("clr", 1.2 * (pow(c, 0.33)));
     bubbleShader.set("mul", c / 5.0);
     bubbleShader.set("opacity", 0.001 + pow(c, 0.75) / 30.0);
-    bubbleShader.set("u_time", millis() / 1000.0);
+    bubbleShader.set("u_time", millis() / 1000.0 + timer_offset);
     effect.endDraw();
     effect.filter(bubbleShader);
     base.image(effect, loc.x, loc.y);
@@ -305,7 +308,7 @@ void setup() {
                 .setPosition(25, height - 125)
                 .setRadius(50)
                 .setDragDirection(Knob.VERTICAL);
-  String[] s = new String[] {"BACKGROUND_BLOBS", "RGB_ENEMIES", "DO_POST_PROCESSING", "BACKGROUND_FADE", "DYNAMIC_BACKGROUND_COLOR", "DO_OBJ_RESET"};
+  String[] s = new String[] {"BACKGROUND_BLOBS", "RGB_ENEMIES", "DO_POST_PROCESSING", "BACKGROUND_FADE", "DYNAMIC_BACKGROUND_COLOR", "DO_OBJ_RESET", "DO_SHAKE"};
   for(int i = 0; i < s.length; i++) {
     songSelect_GUI.addToggle(s[i])
                   .setPosition(35, height - 45 * i - 180)
@@ -336,6 +339,10 @@ void setup() {
 }
 
 void draw() {
+  if(!focused) {
+    return;
+  }
+
   switch(gameState) {
     case "gameSelect": {
       songSelect_GUI.show();
@@ -421,8 +428,10 @@ void draw() {
               SPAWN_PATTERN = 2;
             }else if(rng < 0.7) {
               SPAWN_PATTERN = 3;
-            }else{
+            }else if(rng < 0.85) {
               SPAWN_PATTERN = 4;
+            }else{
+              SPAWN_PATTERN = 5;
             }
           }
 
@@ -510,6 +519,21 @@ void draw() {
                 ));
               }
             } break;
+            case 5: {
+
+              n = int(random(3, 6));
+              int d = 2 + int(c * 8);
+              float sz = random(200, 444 - c * 155);
+              float objRot = random(0, TWO_PI);
+              for(float i = 0; i < TWO_PI; i += TWO_PI / (n * d)) {
+                PVector objLoc = PVector.fromAngle(TWO_PI / n * floor(n * i / TWO_PI)).lerp(PVector.fromAngle(TWO_PI / n * ceil(n * i / TWO_PI)), (i * n / TWO_PI) % 1.0).rotate(objRot).mult(c * sz).add(loc);
+                PVector objVel = PVector.sub(loc, objLoc).setMag(1).rotate(HALF_PI);
+                objs.add(new obj(
+                  PVector.add(objLoc, PVector.mult(objVel, -dis)),
+                  objVel.setMag(speed / 1.8)
+                ));
+              }
+            } break;
           }
           objSpawnTimer = max(objSpawnTimer, 0) + (30 - c * 10);
         }
@@ -523,7 +547,7 @@ void draw() {
           cc.move();
         }
 
-        randTrans = vec2(random(10 * -c, 10 * c), random(10 * -c, 10 * c));
+        randTrans = DO_SHAKE ? vec2(random(10 * -c, 10 * c), random(10 * -c, 10 * c)) : vec2();
         ang += (0.001 + constrain(c / 75, 0, 0.05)) * (200 / frameRate);
         a.speed = constrain(a.speed * (1 + constrain((c - targetComplexity) / 100, -0.05, 0.05)), 0.5, 1.75);
         float dfc = sqrt(sq(width) + sq(height));
@@ -556,8 +580,9 @@ void draw() {
       }else{
         background(0);
       }
-
-      back.filter(reduceOpacity);
+      if(BACKGROUND_FADE && frameCount % max(1, int(frameRate / 200)) == 0) {
+        back.filter(reduceOpacity);
+      }
       back.beginDraw();
       back.imageMode(CENTER);
       back.noStroke();
