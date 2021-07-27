@@ -64,8 +64,18 @@ PVector generateLoc(float d) {
   return vec2(r / cosA * min(abs(cosA), abs(sinA)), r / sinA * min(abs(cosA), abs(sinA)));
 }
 
-void gotHit() {
+void resetEnemies() {
+  for(obj o : objs) o.timer = 0;
+}
+void gotHit(int scoreDeduction, int timerDelay, boolean clearEnemies) {
   grayScaleTimer = 0;
+  if(DO_OBJ_RESET) {
+    score -= scoreDeduction;
+    noScoreTimer = timerDelay;
+    if(clearEnemies) resetEnemies();
+    hitSound.play();
+    hitSound.rewind();
+  }
 }
 
 void songSelected(File file) {
@@ -102,11 +112,12 @@ class bubble {
   bubble(PVector loc) {
     effect = createGraphics(size, size, P2D);
     this.loc = loc;
+    float ang = s_random(0, TWO_PI);
     vel = mulVec(
-      PVector.random2D().mult(random(1.5, 2.5)),
+      PVector.fromAngle(ang).mult(random(1.5, 2.5)),
       vec2(rSign(), rSign())
     );
-    timer_offset = random(0, 1000000);
+    timer_offset = s_random(0, 1000000);
   }
   void update() {
     loc.add(PVector.mult(vel, max(0.01, pow(2 * max(0.01, c - 0.08), 3))));
@@ -163,16 +174,7 @@ class arrow {
     d1 = -mn - (sz) * (cos(rot) + 1);
     if(oT > 120 && dist(x + cos(a) * (d1 - 15), y + sin(a) * (d1 - 15), pos.x, pos.y) <= 30) {
       if(noScoreTimer <= 0) {
-        score -= getOnScreenObjCount() * 2;
-        noScoreTimer = 60;
-        hitSound.play();
-        hitSound.rewind();
-        if(DO_OBJ_RESET) {
-          for (obj o : objs) {
-            o.timer = 0;
-          }
-          gotHit();
-        }
+        gotHit(getOnScreenObjCount() * 2, 60, true);
       }
     }
   }
@@ -235,16 +237,7 @@ class obj {
     }
 
     if (loc.x > pos.x - 20 && loc.x < pos.x + 20 && loc.y > pos.y - 20 && loc.y < pos.y + 20) {
-      score -= getOnScreenObjCount();
-      noScoreTimer = 30;
-      hitSound.play();
-      hitSound.rewind();
-      if(DO_OBJ_RESET) {
-        for (obj o : objs) {
-          o.timer = 0;
-        }
-        gotHit();
-      }
+      gotHit(getOnScreenObjCount(), 30, true);
     }
   }
   void draw(PGraphics base) {
@@ -286,6 +279,8 @@ void settings() {
 void setup() {
   frameRate(FPS);
   surface.setTitle("Aebal");
+
+  unimportantRandoms = new Random();
   pos = new PVector(width / 2, height / 2);
 
   minim = new Minim(this);
@@ -333,9 +328,6 @@ void setup() {
   postProcessing = new PostFX(this);
   postProcessing.preload(BloomPass.class);
   postProcessing.preload(SaturationVibrancePass.class);
-  for(int i = 0; i < 4; i++) {
-    bubbles.add(new bubble(vec2(random(0, width), random(0, height))));
-  }
 }
 
 void draw() {
@@ -370,7 +362,6 @@ void draw() {
             if(songList.get(i).equals("Add Song")) {
               selectInput("Select a music file:", "songSelected");
             }else{
-              gameState = "game";
               String songPath;
               if(songList.get(i).indexOf('\\') > -1 || songList.get(i).indexOf('/') > -1) {
                 songPath = songList.get(i);
@@ -378,7 +369,17 @@ void draw() {
                 songPath = "songs/" + songList.get(i);
               }
               String[] tmp = splitTokens(songList.get(i), "/\\");
-              randomSeed(trim(tmp[tmp.length - 1]).hashCode());
+
+              gameState = "game";
+              resetEnemies();
+              bubbles = new ArrayList();
+              for(int _ = 0; _ < 4; _++) {
+                bubbles.add(new bubble(vec2(s_random(0, width), s_random(0, height))));
+              }
+              int randomSeed = trim(tmp[tmp.length - 1]).hashCode();
+              println("Random seed for \"" + songPath + "\": " + randomSeed);
+              randomSeed(randomSeed);
+              unimportantRandoms.setSeed(randomSeed);
               song = minim.loadFile(songPath);
             }
           }
@@ -428,7 +429,7 @@ void draw() {
               SPAWN_PATTERN = 2;
             }else if(rng < 0.7) {
               SPAWN_PATTERN = 3;
-            }else if(rng < 0.85) {
+            }else if(rng < 0.875) {
               SPAWN_PATTERN = 4;
             }else{
               SPAWN_PATTERN = 5;
@@ -519,18 +520,19 @@ void draw() {
                 ));
               }
             } break;
-            case 5: {
+            case 5: { //Triangle, square, pentagon
 
               n = int(random(3, 6));
-              int d = 2 + int(c * 8);
-              float sz = random(200, 444 - c * 155);
+              int d = 1 + int(c * 5);
+              float sz = random(250, 750 - c * 200);
               float objRot = random(0, TWO_PI);
+              loc.lerp(vec2(width / 2, height / 2), random(0, 1));
               for(float i = 0; i < TWO_PI; i += TWO_PI / (n * d)) {
                 PVector objLoc = PVector.fromAngle(TWO_PI / n * floor(n * i / TWO_PI)).lerp(PVector.fromAngle(TWO_PI / n * ceil(n * i / TWO_PI)), (i * n / TWO_PI) % 1.0).rotate(objRot).mult(c * sz).add(loc);
                 PVector objVel = PVector.sub(loc, objLoc).setMag(1).rotate(HALF_PI);
                 objs.add(new obj(
                   PVector.add(objLoc, PVector.mult(objVel, -dis)),
-                  objVel.setMag(speed / 1.8)
+                  objVel.setMag(speed / 2)
                 ));
               }
             } break;
@@ -547,7 +549,7 @@ void draw() {
           cc.move();
         }
 
-        randTrans = DO_SHAKE ? vec2(random(10 * -c, 10 * c), random(10 * -c, 10 * c)) : vec2();
+        randTrans = DO_SHAKE ? vec2(s_random(10 * -c, 10 * c), s_random(10 * -c, 10 * c)) : vec2();
         ang += (0.001 + constrain(c / 75, 0, 0.05)) * (200 / frameRate);
         a.speed = constrain(a.speed * (1 + constrain((c - targetComplexity) / 100, -0.05, 0.05)), 0.5, 1.75);
         float dfc = sqrt(sq(width) + sq(height));
@@ -652,15 +654,15 @@ void draw() {
         if(intense) {
           if(c >= 1) {
             float offset = (2 * ((2 * c + 0.5) % 1) - 1) / 5;
-            float offset_y = random(-c / 6, c / 6);
-            if(random(0, 1) < 0.5) {
-              nextChroma_r = vec2( offset, random(-offset_y, offset_y));
-              nextChroma_g = vec2(-offset, random(-offset_y, offset_y));
-              nextChroma_b = vec2(random(-offset, offset), random(-offset_y, offset_y));
+            float offset_y = s_random(-c / 6, c / 6);
+            if(s_random(0, 1) < 0.5) {
+              nextChroma_r = vec2( offset, s_random(-offset_y, offset_y));
+              nextChroma_g = vec2(-offset, s_random(-offset_y, offset_y));
+              nextChroma_b = vec2(s_random(-offset, offset), s_random(-offset_y, offset_y));
             }else{
-              nextChroma_r = vec2(random(-offset_y, offset_y), offset);
-              nextChroma_g = vec2(random(-offset_y, offset_y), -offset);
-              nextChroma_b = vec2(random(-offset_y, offset_y), random(-offset, offset));
+              nextChroma_r = vec2(s_random(-offset_y, offset_y), offset);
+              nextChroma_g = vec2(s_random(-offset_y, offset_y), -offset);
+              nextChroma_b = vec2(s_random(-offset_y, offset_y), s_random(-offset, offset));
             }
           }else{
             nextChroma_r = vec2(randTrans.x / 1200.0, 0.0);
