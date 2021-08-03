@@ -14,6 +14,7 @@ float BACKGROUND_COLOR_FADE = 0.33;
 boolean BACKGROUND_BLOBS         = true;
 boolean RGB_ENEMIES              = true;
 boolean DO_POST_PROCESSING       = true;
+boolean DO_CHROMA                = true;
 boolean BACKGROUND_FADE          = true;
 boolean DYNAMIC_BACKGROUND_COLOR = true;
 boolean DO_OBJ_RESET             = true;
@@ -62,6 +63,10 @@ PVector generateLoc(float d) {
   float cosA = cos(a);
   float sinA = sin(a);
   return vec2(r / cosA * min(abs(cosA), abs(sinA)), r / sinA * min(abs(cosA), abs(sinA)));
+}
+
+void addEnemy(PVector loc, PVector vel) {
+  objs.add(new obj(loc, vel));
 }
 
 void resetEnemies() {
@@ -249,6 +254,7 @@ class obj {
 boolean intense = false;
 int score = 0;
 float c, adv, count, objSpawnTimer, ang, noScoreTimer = 0, titleScroll = 0, grayScaleTimer = 100;
+String songPath;
 PVector pos, randTrans, chroma_r, chroma_g, chroma_b;
 StringList songList;
 AudioPlayer song, hitSound;
@@ -257,6 +263,7 @@ FFT fft;
 color backColor;
 PGraphics back, back2;
 PShader bubbleShader, chroma, reduceOpacity, grayScale;
+PFont defaultFont, songFont;
 PostFX postProcessing;
 ArrayList<obj> objs = new ArrayList();
 ArrayList<bubble> bubbles = new ArrayList();
@@ -271,7 +278,7 @@ color globalObjColor;
 float FIFTH_PI = 0.62831853071;
 
 void settings() {
-  fullScreen(P2D, 3);
+  fullScreen(P2D, 2);
   smooth(4);
   PJOGL.setIcon("aebal.png");
 }
@@ -290,6 +297,9 @@ void setup() {
   songList = new StringList(new File(dataPath("songs")).list());
   songList.append("Add Song");
 
+  defaultFont = createFont("defaultFont.ttf", 128);
+  songFont = createFont("songFont.ttf", 64);
+
   back  = createGraphics(width, height, P2D);
   back2 = createGraphics(width, height, P2D);
 
@@ -303,7 +313,7 @@ void setup() {
                 .setPosition(25, height - 125)
                 .setRadius(50)
                 .setDragDirection(Knob.VERTICAL);
-  String[] s = new String[] {"BACKGROUND_BLOBS", "RGB_ENEMIES", "DO_POST_PROCESSING", "BACKGROUND_FADE", "DYNAMIC_BACKGROUND_COLOR", "DO_OBJ_RESET", "DO_SHAKE"};
+  String[] s = new String[] {"BACKGROUND_BLOBS", "RGB_ENEMIES", "DO_POST_PROCESSING", "DO_CHROMA", "BACKGROUND_FADE", "DYNAMIC_BACKGROUND_COLOR", "DO_OBJ_RESET", "DO_SHAKE"};
   for(int i = 0; i < s.length; i++) {
     songSelect_GUI.addToggle(s[i])
                   .setPosition(35, height - 45 * i - 180)
@@ -362,7 +372,6 @@ void draw() {
             if(songList.get(i).equals("Add Song")) {
               selectInput("Select a music file:", "songSelected");
             }else{
-              String songPath;
               if(songList.get(i).indexOf('\\') > -1 || songList.get(i).indexOf('/') > -1) {
                 songPath = songList.get(i);
               }else{
@@ -381,6 +390,7 @@ void draw() {
               randomSeed(randomSeed);
               unimportantRandoms.setSeed(randomSeed);
               song = minim.loadFile(songPath);
+              songPath = splitTokens(trim(tmp[tmp.length - 1]), ".")[0];
             }
           }
         popMatrix();
@@ -393,7 +403,6 @@ void draw() {
         
         textAlign(LEFT);
         noCursor();
-        rectMode(CENTER);
       }
     } break;
 
@@ -435,15 +444,13 @@ void draw() {
               SPAWN_PATTERN = 5;
             }
           }
-
           switch(SPAWN_PATTERN) {
             case 0: { //Single
 
               loc = generateLoc(300);
               float TLX = lerp(random(width  / 2 - f.size / 2, width  / 2 + f.size / 2), pos.x, random(0, 1));
               float TLY = lerp(random(height / 2 - f.size / 2, height / 2 + f.size / 2), pos.y, random(0, 1));
-              float a = atan2(TLY - loc.y, TLX - loc.x);
-              objs.add(new obj(loc.x, loc.y, speed * cos(a), speed * sin(a)));
+              addEnemy(loc, PVector.fromAngle(atan2(TLY - loc.y, TLX - loc.x)).mult(speed));
             } break;
             case 1: { //star, circle, spiral
 
@@ -462,13 +469,10 @@ void draw() {
               for(float a = 0; a < TWO_PI; a += adder) {
                 float adjA = a + QUARTER_PI;
                 float adjDist = isSpiral ? dis + a * 700 : dis;
-                float nX = loc.x + cos(adjA) * adjDist + sin(adjA) * rad + (isCircle > 0 ? cos(a + HALF_PI) * isCircle : 0);
-                float nY = loc.y + sin(adjA) * adjDist + cos(adjA) * rad + (isCircle > 0 ? sin(a + HALF_PI) * isCircle : 0);
-                objs.add(
-                  new obj(
-                    nX, nY, -speed * cos(adjA), -speed * sin(adjA)
-                  )
-                );
+
+                PVector spawnLoc = loc.copy().add(PVector.fromAngle(adjA).mult(adjDist)).add(vec2(sin(adjA), cos(adjA)).mult(rad));
+                if(isCircle > 0) spawnLoc.add(PVector.fromAngle(a + HALF_PI).mult(isCircle));
+                addEnemy(spawnLoc, PVector.fromAngle(adjA).mult(-speed));
               }
             } break;
             case 2: { //Line
@@ -549,6 +553,8 @@ void draw() {
           cc.move();
         }
 
+        rectMode(CENTER);
+
         randTrans = DO_SHAKE ? vec2(s_random(10 * -c, 10 * c), s_random(10 * -c, 10 * c)) : vec2();
         ang += (0.001 + constrain(c / 75, 0, 0.05)) * (200 / frameRate);
         a.speed = constrain(a.speed * (1 + constrain((c - targetComplexity) / 100, -0.05, 0.05)), 0.5, 1.75);
@@ -570,6 +576,7 @@ void draw() {
             b.update();
           }
         }
+        score = max(0, score);
       }
       
       if(DYNAMIC_BACKGROUND_COLOR) {
@@ -598,11 +605,12 @@ void draw() {
         }
       }
 
-      back.fill(255);
-      back.stroke(255);
-      back.strokeWeight(5);
-      back.line(pre_pos.x, pre_pos.y, pos.x, pos.y);
-      
+      if(BACKGROUND_FADE) {
+        back.fill(255);
+        back.stroke(255);
+        back.strokeWeight(5);
+        back.line(pre_pos.x, pre_pos.y, pos.x, pos.y);
+      }
       colorMode(HSB);
       globalObjColor = lerpColor(globalObjColor, (intense && RGB_ENEMIES) ? color((millis() / 5.0) % 255, 164, 255) : color(0, 255, 255), 4.0 / frameRate);
 
@@ -645,50 +653,56 @@ void draw() {
           builder.saturationVibrance(0.4 + c / 3.0, 0.4 + c / 3.0);
         }
         builder.compose();
-
-        float prec = 0.75;
-        PVector nextChroma_r;
-        PVector nextChroma_g;
-        PVector nextChroma_b;
-        PVector zeroVector = new PVector(0.0, 0.0);
-        if(intense) {
-          if(c >= 1) {
-            float offset = (2 * ((2 * c + 0.5) % 1) - 1) / 5;
-            float offset_y = s_random(-c / 6, c / 6);
-            if(s_random(0, 1) < 0.5) {
-              nextChroma_r = vec2( offset, s_random(-offset_y, offset_y));
-              nextChroma_g = vec2(-offset, s_random(-offset_y, offset_y));
-              nextChroma_b = vec2(s_random(-offset, offset), s_random(-offset_y, offset_y));
+        if(DO_CHROMA) {
+          float prec = 0.75;
+          PVector nextChroma_r;
+          PVector nextChroma_g;
+          PVector nextChroma_b;
+          PVector zeroVector = new PVector(0.0, 0.0);
+          if(intense) {
+            if(c >= 1) {
+              float offset = (2 * ((2 * c + 0.5) % 1) - 1) / 5;
+              float offset_y = s_random(-c / 6, c / 6);
+              if(s_random(0, 1) < 0.5) {
+                nextChroma_r = vec2( offset, s_random(-offset_y, offset_y));
+                nextChroma_g = vec2(-offset, s_random(-offset_y, offset_y));
+                nextChroma_b = vec2(s_random(-offset, offset), s_random(-offset_y, offset_y));
+              }else{
+                nextChroma_r = vec2(s_random(-offset_y, offset_y), offset);
+                nextChroma_g = vec2(s_random(-offset_y, offset_y), -offset);
+                nextChroma_b = vec2(s_random(-offset_y, offset_y), s_random(-offset, offset));
+              }
             }else{
-              nextChroma_r = vec2(s_random(-offset_y, offset_y), offset);
-              nextChroma_g = vec2(s_random(-offset_y, offset_y), -offset);
-              nextChroma_b = vec2(s_random(-offset_y, offset_y), s_random(-offset, offset));
+              nextChroma_r = vec2(randTrans.x / 1200.0, 0.0);
+              nextChroma_g = vec2(0, 0);
+              nextChroma_b = vec2(0.0, randTrans.y / 1200.0);
             }
           }else{
-            nextChroma_r = vec2(randTrans.x / 1200.0, 0.0);
-            nextChroma_g = vec2(0, 0);
-            nextChroma_b = vec2(0.0, randTrans.y / 1200.0);
+            nextChroma_r = zeroVector;
+            nextChroma_g = zeroVector;
+            nextChroma_b = zeroVector;
           }
-        }else{
-          nextChroma_r = zeroVector;
-          nextChroma_g = zeroVector;
-          nextChroma_b = zeroVector;
+          chroma_r = chroma_r.mult(prec).add(nextChroma_r.mult(1 - prec));
+          chroma_g = chroma_g.mult(prec).add(nextChroma_g.mult(1 - prec));
+          chroma_b = chroma_b.mult(prec).add(nextChroma_b.mult(1 - prec));
+          chroma.set("r", chroma_r.x, chroma_r.y);
+          chroma.set("g", chroma_g.x, chroma_g.y);
+          chroma.set("b", chroma_b.x, chroma_b.y);
+          filter(chroma);
         }
-        chroma_r = chroma_r.mult(prec).add(nextChroma_r.mult(1 - prec));
-        chroma_g = chroma_g.mult(prec).add(nextChroma_g.mult(1 - prec));
-        chroma_b = chroma_b.mult(prec).add(nextChroma_b.mult(1 - prec));
-        chroma.set("r", chroma_r.x, chroma_r.y);
-        chroma.set("g", chroma_g.x, chroma_g.y);
-        chroma.set("b", chroma_b.x, chroma_b.y);
-        filter(chroma);
       }
 
-      colorMode(HSB);
-      fill(200, 255, 255);
-      score = max(0, score);
+      colorMode(RGB);
+      fill(144, 227, 154);
       textSize(50);
       textAlign(LEFT, TOP);
-      text("Score: " + score + "\nComplexity: " + songComplexity + "\nIntensity: " + round(c * 100) + "\nFPS: " + round(frameRate), 10, 10);
+      text("Score: " + score, 10, 0);
+
+      fill(255, 200);
+      textFont(songFont, 48);
+      textAlign(LEFT, BOTTOM);
+      text(songPath + " | " + round(100 - 100 * songComplexity) + '%', 10, height - 10);
+      textFont(defaultFont);
 
       if(DO_POST_PROCESSING) {
         grayScaleTimer += 4 / frameRate;
@@ -700,6 +714,14 @@ void draw() {
       }
     } break;
   }
+  rectMode(CORNER);
+  noStroke();
+  fill(25, 128);
+  rect(width - 82, 2, 80, 20, 3);
+  fill(255);
+  textAlign(LEFT, CENTER);
+  textSize(15);
+  text("FPS: " + nf(round(frameRate), 4), width - 80, 10);
 }
 
 void keyPressed() {
