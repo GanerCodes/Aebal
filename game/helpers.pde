@@ -20,3 +20,7 @@ Random unimportantRandoms;
 float s_random(float a, float b) {
     return lerp(a, b, unimportantRandoms.nextFloat());
 }
+
+float cNorm(float a, float b, float c) {
+    return constrain(norm(a, b, c), 0, 1);
+}

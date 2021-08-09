@@ -75,12 +75,19 @@ void resetEnemies() {
 void gotHit(int scoreDeduction, int timerDelay, boolean clearEnemies) {
   grayScaleTimer = 0;
   if(DO_OBJ_RESET) {
+    hitCount++;
     score -= scoreDeduction;
     noScoreTimer = timerDelay;
     if(clearEnemies) resetEnemies();
     hitSound.play();
     hitSound.rewind();
   }
+}
+void resetLevel() {
+  score = 0;
+  hitCount = 0;
+  textSFX.pause();
+  textSFX.rewind();
 }
 
 void songSelected(File file) {
@@ -251,17 +258,18 @@ class obj {
 }
 
 //General vars
-boolean intense = false;
-int score = 0;
+boolean intense = false, textSFXPlaying = false, songEndScreenSkippable = false;
+int score = 0, hitCount = 0, endScreenTimerOffset;
 float c, adv, count, objSpawnTimer, ang, noScoreTimer = 0, titleScroll = 0, grayScaleTimer = 100;
 String songPath;
 PVector pos, randTrans, chroma_r, chroma_g, chroma_b;
 StringList songList;
-AudioPlayer song, hitSound;
+AudioPlayer song, hitSound, textSFX;
 Minim minim;
 FFT fft;
 color backColor;
 PGraphics back, back2;
+PImage screen;
 PShader bubbleShader, chroma, reduceOpacity, grayScale;
 PFont defaultFont, songFont;
 PostFX postProcessing;
@@ -293,6 +301,9 @@ void setup() {
   minim = new Minim(this);
   hitSound = minim.loadFile("hit.wav");
   hitSound.setGain(-3);
+  textSFX = minim.loadFile("textSFX.wav");
+  textSFX.setGain(-18);
+  textSFX.setLoopPoints(20, 500);
 
   songList = new StringList(new File(dataPath("songs")).list());
   songList.append("Add Song");
@@ -350,14 +361,14 @@ void draw() {
       songSelect_GUI.show();
       cursor();
       rectMode(CORNER);
-      textSize(14);
+      textFont(defaultFont, 15);
       background(0);
       int expandSize = 150;
       float sc = width / 9.0;
       float dd = ((width - sc) - (9 * sc + 100)) / 2;
       for(int i = 0; i < songList.size(); i++) {
-        int x = int((i % 10) * sc + dd);
-        int y = int((i / 10) * sc + dd);
+        int x = int(i % 10 * sc + dd); //Fun fact, mod is eval'd with the same ordering as multiplication and division
+        int y = int(i / 10 * sc + dd);
         boolean inside = mouseX > x && mouseX < x + expandSize && mouseY > y + titleScroll && mouseY < y + titleScroll + expandSize;
         pushMatrix();
           translate(0, titleScroll);
@@ -365,7 +376,7 @@ void draw() {
           stroke(255);
           strokeWeight(4);
           rect(x, y, expandSize, expandSize, 15);
-          fill(0);
+          fill(32);
           textAlign(CENTER);
           text(songList.get(i), x + 5, y + 5, expandSize - 7, expandSize - 7);
           if(mousePressed && inside) {
@@ -381,6 +392,7 @@ void draw() {
 
               gameState = "game";
               resetEnemies();
+              resetLevel();
               bubbles = new ArrayList();
               for(int _ = 0; _ < 4; _++) {
                 bubbles.add(new bubble(vec2(s_random(0, width), s_random(0, height))));
@@ -444,6 +456,7 @@ void draw() {
               SPAWN_PATTERN = 5;
             }
           }
+
           switch(SPAWN_PATTERN) {
             case 0: { //Single
 
@@ -495,7 +508,7 @@ void draw() {
               float sz = 50 + c * 80;
               float screenAngle = random(0, TWO_PI);
               float objRot = random(0, TWO_PI) + HALF_PI;
-              float density = random(0.15, 0.5);
+              float density = max(0.2, 0.5 - c / 3);
               speed /= 2;
               for(float x = -1; x < 1; x += density) {
                 for(float y = -1; y < 1; y += density) {
@@ -524,9 +537,9 @@ void draw() {
                 ));
               }
             } break;
-            case 5: { //Triangle, square, pentagon
+            case 5: { //Triangle, square, pentagon, hexagon
 
-              n = int(random(3, 6));
+              n = int(random(3, 6.25));
               int d = 1 + int(c * 5);
               float sz = random(250, 750 - c * 200);
               float objRot = random(0, TWO_PI);
@@ -637,6 +650,7 @@ void draw() {
         fill(255, 0, 0);
         rect(mouseX, mouseY, 10, 10);
       }
+
       pushMatrix(); {
         if (intense) { //Add physics tick conditional here?
           translate(randTrans.x, randTrans.y);
@@ -701,6 +715,7 @@ void draw() {
       fill(255, 200);
       textFont(songFont, 48);
       textAlign(LEFT, BOTTOM);
+      songComplexity = max(songComplexity, 0.08);
       text(songPath + " | " + round(100 - 100 * songComplexity) + '%', 10, height - 10);
       textFont(defaultFont);
 
@@ -712,26 +727,89 @@ void draw() {
           filter(grayScale);
         }
       }
+
+      if(!song.isPlaying()) {
+        gameState = "levelSummary";
+        endScreenTimerOffset = millis();
+        textSFXPlaying = false;
+        screen = get(); //I can't figure out how to use just the back buffer because I'm tired and dumb so I'm doing this
+        back.beginDraw();
+        back.background(screen);
+        back.endDraw();
+      }
+    } break;
+    case "levelSummary": {
+      int durationInto = millis() - endScreenTimerOffset;
+
+      int adjustedScoreDuration    = min(1500, 100 * score   );
+      int adjustedHitCountDuration = min(1500, 100 * hitCount);
+
+      int scoreTickStart = 2000;
+      int scoreTickEnd   = scoreTickStart + adjustedScoreDuration;
+      int hitCountStart  = scoreTickEnd + 1000;
+      int hitCountEnd    = hitCountStart + adjustedHitCountDuration;
+
+      int adjustedScore    = int(cNorm(durationInto, scoreTickStart, scoreTickEnd) * score   );
+      int adjustedHitCount = int(cNorm(durationInto, hitCountStart , hitCountEnd ) * hitCount);
+
+      boolean playSound = (score > 0 && durationInto > scoreTickStart && durationInto < scoreTickEnd) || (hitCount > 0 && durationInto > hitCountStart && durationInto < hitCountEnd);
+      if(!textSFXPlaying && playSound) { //Because .isPlaying() returns false for a second after it loops
+        textSFXPlaying = true;
+        textSFX.loop();
+      }
+      if(textSFXPlaying && !playSound) {
+        textSFXPlaying = false;
+        textSFX.pause();
+        textSFX.rewind();
+      }
+
+      cursor();
+      background(0);
+      if(frameCount % max(1, int(frameRate / 50)) == 0) {
+        back.filter(reduceOpacity);
+      }
+      image(back, 0, 0);
+      textAlign(CENTER, CENTER);
+      textFont(songFont, 72);
+      fill(255);
+      text(songPath, width / 2, height / 4.5);
+      textAlign(LEFT, CENTER);
+      float titleWidth = textWidth(songPath) / 2;
+      textFont(songFont, 40);
+      float calculatedScore = float(score) / (1 + float(hitCount) / 2.5) * sq(1.4 * (1.0 - songComplexity));
+      text("Score:\t\t " + adjustedScore + "\nHit Count:\t\t " + adjustedHitCount+"\nGrade:\t\t " + calculatedScore, width / 2 - titleWidth, height / 2.33);
+
+      if(durationInto > 500) songEndScreenSkippable = true;
+
+      if(durationInto > hitCountEnd + 1000) {
+        textFont(songFont, 48);
+        textAlign(CENTER, CENTER);
+        text("<Press any key to continue>", width / 2, height / 1.4);
+      }
+
     } break;
   }
-  rectMode(CORNER);
-  noStroke();
-  fill(25, 128);
-  rect(width - 82, 2, 80, 20, 3);
-  fill(255);
-  textAlign(LEFT, CENTER);
-  textSize(15);
-  text("FPS: " + nf(round(frameRate), 4), width - 80, 10);
+
+  { //FPS Tracker
+    rectMode(CORNER);
+    noStroke();
+    fill(25, 128);
+    rect(width - 82, 2, 80, 20, 3);
+    fill(255);
+    textAlign(LEFT, CENTER);
+    textSize(15);
+    text("FPS: " + nf(round(frameRate), 4), width - 80, 10);
+  }
 }
 
 void keyPressed() {
   if(key == ESC) {
     key = 0;
-    if(gameState == "game") {
+    if(gameState.equals("game") || gameState.equals("levelSummary")) {
       gameState = "gameSelect";
       song.close();
-      score = 0;
-    }else if(gameState == "gameSelect") {
+      resetLevel();
+    }else if(gameState.equals("gameSelect")) {
       exit();
     }
   }else if(gameState == "game") {
@@ -747,6 +825,13 @@ void keyPressed() {
           song.skip(30 * 1000);
         }
       } break;
+    }
+  }else if(gameState.equals("levelSummary")) {
+    if(songEndScreenSkippable) {
+      gameState = "gameSelect";
+      song.close();
+      resetLevel();
+      songEndScreenSkippable = false;
     }
   }
 }
