@@ -11,16 +11,16 @@ float songComplexity = 0.2; //How "Complex" the current song is, aka make this h
 float targetComplexity = 0.26; //Magic number leave it be
 float GAIN = -15;
 float BACKGROUND_COLOR_FADE = 0.33;
-boolean BACKGROUND_BLOBS         = true;
-boolean RGB_ENEMIES              = true;
-boolean DO_POST_PROCESSING       = true;
-boolean DO_CHROMA                = true;
-boolean BACKGROUND_FADE          = true;
 boolean DYNAMIC_BACKGROUND_COLOR = true;
+boolean DO_POST_PROCESSING       = true;
+boolean BACKGROUND_BLOBS         = true;
+boolean BACKGROUND_FADE          = true;
+boolean DO_HIT_PROMPTS           = true;
 boolean DO_OBJ_RESET             = true;
+boolean RGB_ENEMIES              = true;
+boolean DO_CHROMA                = true;
 boolean DO_SHAKE                 = true;
 boolean SHOW_FPS                 = true;
-boolean DO_HIT_PROMPTS           = true;
 
 String gameState = "gameSelect";
 
@@ -80,7 +80,9 @@ void addEnemy(PVector loc, PVector vel) {
 void resetEnemies(int scoreDeduction) {
   for(obj o : objs) {
     o.timer = 0;
-    if(DO_HIT_PROMPTS) floatingPrompts.add(new floatingText(o.loc.x, o.loc.y, 1500, str(-scoreDeduction)));
+    boolean isInside = (scoreDeduction > 0) && o.inBox();
+    if(isInside) score--;
+    if(DO_HIT_PROMPTS) floatingPrompts.add(new floatingText(o.loc.x, o.loc.y, 1500, str(-scoreDeduction - (isInside ? 1 : 0))));
   }
 }
 
@@ -100,6 +102,8 @@ void resetLevel() {
   score = 0;
   hitCount = 0;
   levelSummary_timer = 0;
+  song_total_intensity = 0;
+  song_intensity_count = 0;
   textSFX.pause();
   textSFX.rewind();
 }
@@ -137,6 +141,10 @@ void songSelected(File file) {
   songList.insert(songList.size() - 1, file.getAbsolutePath());
 }
 
+float adjMillis() {
+  return millis() + millisDelta;
+}
+
 class field {
   float size;
   boolean isOutside;
@@ -149,7 +157,7 @@ class field {
     noFill();
     strokeWeight(10);
     stroke(255);
-    rect(width / 2, height / 2, constrain(size, 5, width - 5), constrain(size, 5, height - 5));
+    rect(width / 2, height / 2, min(size, width - 5), min(size, height - 5));
   }
   void update() {
     float mn = size / 2 - 10 - 5;
@@ -195,7 +203,7 @@ class bubble {
     bubbleShader.set("clr", 1.2 * (pow(c, 0.33)));
     bubbleShader.set("mul", c / 5.0);
     bubbleShader.set("opacity", 0.001 + pow(c, 0.75) / 30.0);
-    bubbleShader.set("u_time", millis() / 1000.0 + timer_offset);
+    bubbleShader.set("u_time", adjMillis() / 1000.0 + timer_offset);
     effect.endDraw();
     effect.filter(bubbleShader);
     base.image(effect, loc.x, loc.y);
@@ -277,6 +285,9 @@ class obj {
   boolean onScreen() {
     return (loc.x > -10 && loc.x < width + 10 && loc.y > -10 && loc.y < height + 10);
   }
+  boolean inBox() {
+    return (loc.x > width / 2 - (f.size / 2) - 2 && loc.x < width / 2 + (f.size / 2) + 2 && loc.y > height / 2 - (f.size / 2) - 2 && loc.y < height / 2 + (f.size / 2) + 2);
+  }
   void move() {
     float speed = int(c * 14.5) / 6.25 + 0.1;
 
@@ -303,29 +314,28 @@ class obj {
 
 class floatingText {
   String txt;
-  float x, y;
-  int delTime, startTime;
+  float x, y, startTime, delTime;
   floatingText(float x, float y, int duration, String txt) {
     this.x = x;
     this.y = y;
     this.txt = txt;
-    this.startTime = millis();
+    this.startTime = adjMillis();
     delTime = startTime + duration;
   }
   void draw() {
-    if(delTime - millis() > 1000) {
+    if(delTime - adjMillis() > 1000) {
       fill(255);
     }else{
-      fill(255, ((delTime - millis()) / 1000.0) * 255.0);
+      fill(255, ((delTime - adjMillis()) / 1000.0) * 255.0);
     }
-    text(txt, x, y - 75 * sqrt(map(millis(), startTime, delTime, 0, 1)));  
+    text(txt, x, y - 75 * sqrt(map(adjMillis(), startTime, delTime, 0, 1)));  
   }
 }
 
 //General vars
 boolean intense = false, textSFXPlaying = false, songEndScreenSkippable = false, mouseOverSong = false;
-int score = 0, hitCount = 0, levelSummary_timer = 0, endScreenTimerOffset, previousCursor = -1, activeCursor = ARROW;
-float c, adv, count, objSpawnTimer, ang, noScoreTimer = 0, grayScaleTimer = 100;
+int score = 0, hitCount = 0, song_intensity_count = 0, levelSummary_timer = 0, endScreenTimerOffset, previousCursor = -1, activeCursor = ARROW, deltaMillisStart = 0;
+float c, adv, count, objSpawnTimer, ang, noScoreTimer = 0, grayScaleTimer = 100, song_total_intensity = 0, millisDelta = 0;
 String songPath;
 PVector pos, randTrans, chroma_r, chroma_g, chroma_b;
 StringList songList;
@@ -404,7 +414,24 @@ void setup() {
 }
 
 void draw() {
-  if(!focused) return;
+  if(focused) {
+    if(gameState.equals("game")) {
+      if(!song.isPlaying() && song.position() < song.length()) {
+        millisDelta -= deltaMillisStart - millis(); //Subtract missed time from new adjMillis
+        song.play();
+        frameRate(FPS);
+      }
+    }
+  }else{
+    if(gameState.equals("game")) { 
+      if(song.isPlaying()) {
+        deltaMillisStart = millis();
+        song.pause();
+        frameRate(60);
+      }
+    }
+    return;
+  }
   previousCursor = activeCursor;
 
   switch(gameState) {
@@ -462,7 +489,10 @@ void draw() {
 
     case "game": {
       fft.forward(song.mix);
-      c = findComplexity(song.mix.toArray()) * (targetComplexity / songComplexity) * (0.65 + song.mix.level());
+      float tmp_intensity = findComplexity(song.mix.toArray()) * (0.65 + song.mix.level());
+      c = tmp_intensity * (targetComplexity / songComplexity);
+      song_total_intensity += tmp_intensity;
+      song_intensity_count++;
       noScoreTimer -= (60 / frameRate);
       objSpawnTimer -= c * 2 * (60 / frameRate);
     
@@ -669,7 +699,7 @@ void draw() {
         back.line(pre_pos.x, pre_pos.y, pos.x, pos.y);
       }
       colorMode(HSB);
-      globalObjColor = lerpColor(globalObjColor, (intense && RGB_ENEMIES) ? color((millis() / 5.0) % 255, 164, 255) : color(0, 255, 255), 4.0 / frameRate);
+      globalObjColor = lerpColor(globalObjColor, (intense && RGB_ENEMIES) ? color((adjMillis() / 5.0) % 255, 164, 255) : color(0, 255, 255), 4.0 / frameRate);
 
       back.noStroke();
       back.fill(globalObjColor);
@@ -753,7 +783,7 @@ void draw() {
         for(int i = floatingPrompts.size() - 1; i > -1; i--) {
           floatingText o = floatingPrompts.get(i);
           o.draw();
-          if(millis() > o.delTime) {
+          if(adjMillis() > o.delTime) {
             floatingPrompts.remove(i);
           }
         }
@@ -792,24 +822,25 @@ void draw() {
               objs.remove(i);
               score++;
             }
-            levelSummary_timer = millis() + 2000;
+            levelSummary_timer = int(adjMillis() + 2000);
           }else{
             levelSummary_timer = 1;
           }
-        }else if(millis() > levelSummary_timer) {
+        }else if(adjMillis() > levelSummary_timer) {
           levelSummary_timer = 0;
           gameState = "levelSummary";
-          endScreenTimerOffset = millis();
+          endScreenTimerOffset = int(adjMillis());
           textSFXPlaying = false;
           screen = get(); //I can't figure out how to use just the back buffer because I'm tired and dumb so I'm doing this
           back.beginDraw();
           back.background(screen);
           back.endDraw();
+          println("Average calculated intensity: " + song_total_intensity / song_intensity_count);
         }
       }
     } break;
     case "levelSummary": {
-      int durationInto = millis() - endScreenTimerOffset;
+      int durationInto = int(adjMillis() - endScreenTimerOffset);
 
       int adjustedScoreDuration    = min(1500, 100 * score   );
       int adjustedHitCountDuration = min(1500, 100 * hitCount);
