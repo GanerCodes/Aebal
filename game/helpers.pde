@@ -24,3 +24,7 @@ float s_random(float a, float b) {
 float cNorm(float a, float b, float c) {
     return constrain(norm(a, b, c), 0, 1);
 }
+
+float sign(float x) {
+    return x < 0 ? -1 : 1;
+}

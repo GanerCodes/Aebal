@@ -1,10 +1,10 @@
 import ch.bildspur.postfx.builder.*;
 import ch.bildspur.postfx.pass.*;
 import ch.bildspur.postfx.*;
+import java.lang.Math;
 import java.io.File;
 import ddf.minim.*;
 import ddf.minim.analysis.*;
-import controlP5.*;
 
 float FPS = 1000;
 float songComplexity = 0.2; //How "Complex" the current song is, aka make this higher if your song is really loud/bassy
@@ -19,6 +19,8 @@ boolean BACKGROUND_FADE          = true;
 boolean DYNAMIC_BACKGROUND_COLOR = true;
 boolean DO_OBJ_RESET             = true;
 boolean DO_SHAKE                 = true;
+boolean SHOW_FPS                 = true;
+boolean DO_HIT_PROMPTS           = true;
 
 String gameState = "gameSelect";
 
@@ -56,6 +58,12 @@ float[] rectAngleMap(float a, float w, float h) {
   };
 }
 
+void moveSongSel(int a) {
+  gameSelect_songSelect_actual += a;
+  songSelChange.play();
+  songSelChange.rewind();
+}
+
 PVector generateLoc(float d) {
   float largestAxisSize = max(width, height);
   float a = random(-PI, PI);
@@ -69,25 +77,60 @@ void addEnemy(PVector loc, PVector vel) {
   objs.add(new obj(loc, vel));
 }
 
-void resetEnemies() {
-  for(obj o : objs) o.timer = 0;
+void resetEnemies(int scoreDeduction) {
+  for(obj o : objs) {
+    o.timer = 0;
+    if(DO_HIT_PROMPTS) floatingPrompts.add(new floatingText(o.loc.x, o.loc.y, 1500, str(-scoreDeduction)));
+  }
 }
-void gotHit(int scoreDeduction, int timerDelay, boolean clearEnemies) {
+
+void gotHit(int scoreDeduction, int timerDelay, boolean clearEnemies, int individualPointReduction) {
   grayScaleTimer = 0;
   if(DO_OBJ_RESET) {
     hitCount++;
     score -= scoreDeduction;
     noScoreTimer = timerDelay;
-    if(clearEnemies) resetEnemies();
+    if(clearEnemies) resetEnemies(individualPointReduction);
     hitSound.play();
     hitSound.rewind();
   }
 }
+
 void resetLevel() {
   score = 0;
   hitCount = 0;
+  levelSummary_timer = 0;
   textSFX.pause();
   textSFX.rewind();
+}
+
+void selectLevel(String songName) {
+  if(songName.indexOf('\\') > -1 || songName.indexOf('/') > -1) {
+    songPath = songName;
+  }else{
+    songPath = "songs/" + songName;
+  }
+  String[] tmp = splitTokens(songName, "/\\");
+  gameState = "game";
+  resetEnemies(0);
+  resetLevel();
+  bubbles = new ArrayList();
+  floatingPrompts = new ArrayList();
+  for(int _ = 0; _ < 4; _++) {
+    bubbles.add(new bubble(vec2(s_random(0, width), s_random(0, height))));
+  }
+  int randomSeed = trim(tmp[tmp.length - 1]).hashCode();
+  println("Random seed for \"" + songPath + "\": " + randomSeed);
+  randomSeed(randomSeed);
+  unimportantRandoms.setSeed(randomSeed);
+  song = minim.loadFile(songPath);
+  songPath = new File(songPath).getName().replaceFirst("[.][^.]+$", "");;
+
+  song.setGain(GAIN);
+  song.play();
+  fft = new FFT(song.bufferSize(), song.sampleRate());
+  
+  textAlign(LEFT);
 }
 
 void songSelected(File file) {
@@ -186,7 +229,8 @@ class arrow {
     d1 = -mn - (sz) * (cos(rot) + 1);
     if(oT > 120 && dist(x + cos(a) * (d1 - 15), y + sin(a) * (d1 - 15), pos.x, pos.y) <= 30) {
       if(noScoreTimer <= 0) {
-        gotHit(getOnScreenObjCount() * 2, 60, true);
+        gotHit(getOnScreenObjCount() * 2 + 3, 60, true, 2);
+        floatingPrompts.add(new floatingText(x + cos(a) * d1, y + sin(a) * d1, 2250, "-3"));
       }
     }
   }
@@ -249,7 +293,7 @@ class obj {
     }
 
     if (loc.x > pos.x - 20 && loc.x < pos.x + 20 && loc.y > pos.y - 20 && loc.y < pos.y + 20) {
-      gotHit(getOnScreenObjCount(), 30, true);
+      gotHit(getOnScreenObjCount(), 30, true, 1);
     }
   }
   void draw(PGraphics base) {
@@ -257,30 +301,52 @@ class obj {
   }
 }
 
+class floatingText {
+  String txt;
+  float x, y;
+  int delTime, startTime;
+  floatingText(float x, float y, int duration, String txt) {
+    this.x = x;
+    this.y = y;
+    this.txt = txt;
+    this.startTime = millis();
+    delTime = startTime + duration;
+  }
+  void draw() {
+    if(delTime - millis() > 1000) {
+      fill(255);
+    }else{
+      fill(255, ((delTime - millis()) / 1000.0) * 255.0);
+    }
+    text(txt, x, y - 75 * sqrt(map(millis(), startTime, delTime, 0, 1)));  
+  }
+}
+
 //General vars
-boolean intense = false, textSFXPlaying = false, songEndScreenSkippable = false;
-int score = 0, hitCount = 0, endScreenTimerOffset;
-float c, adv, count, objSpawnTimer, ang, noScoreTimer = 0, titleScroll = 0, grayScaleTimer = 100;
+boolean intense = false, textSFXPlaying = false, songEndScreenSkippable = false, mouseOverSong = false;
+int score = 0, hitCount = 0, levelSummary_timer = 0, endScreenTimerOffset, previousCursor = -1, activeCursor = ARROW;
+float c, adv, count, objSpawnTimer, ang, noScoreTimer = 0, grayScaleTimer = 100;
 String songPath;
 PVector pos, randTrans, chroma_r, chroma_g, chroma_b;
 StringList songList;
-AudioPlayer song, hitSound, textSFX;
+AudioPlayer song, hitSound, textSFX, songSelChange, gainScore;
 Minim minim;
 FFT fft;
-color backColor;
+color backColor, globalObjColor;
 PGraphics back, back2;
-PImage screen;
+PImage screen, text_logo;
 PShader bubbleShader, chroma, reduceOpacity, grayScale;
 PFont defaultFont, songFont;
 PostFX postProcessing;
 ArrayList<obj> objs = new ArrayList();
 ArrayList<bubble> bubbles = new ArrayList();
-ControlP5 songSelect_GUI;
+ArrayList<floatingText> floatingPrompts = new ArrayList();
 field f;
 arrow a;
 
-//Vars to save or avoid recalculations
-color globalObjColor;
+float gameSelect_songSelect = 3;
+int gameSelect_songSelect_actual = 0;
+int gameSelect_songDisplayCount = 5;
 
 //Math related constants
 float FIFTH_PI = 0.62831853071;
@@ -301,12 +367,18 @@ void setup() {
   minim = new Minim(this);
   hitSound = minim.loadFile("hit.wav");
   hitSound.setGain(-3);
+  gainScore = minim.loadFile("gainScore.wav");
+  gainScore.setGain(-20);
+  songSelChange = minim.loadFile("songSelChange.wav");
+  songSelChange.setGain(-15);
   textSFX = minim.loadFile("textSFX.wav");
   textSFX.setGain(-18);
   textSFX.setLoopPoints(20, 500);
 
+  text_logo = loadImage("aebal_text.png");
   songList = new StringList(new File(dataPath("songs")).list());
-  songList.append("Add Song");
+  gameSelect_songSelect_actual = songList.size() / 2;
+  gameSelect_songSelect = gameSelect_songSelect_actual;
 
   defaultFont = createFont("defaultFont.ttf", 128);
   songFont = createFont("songFont.ttf", 64);
@@ -316,26 +388,6 @@ void setup() {
 
   strokeCap(PROJECT);
   textFont(createFont("font.ttf", 64));
-  
-  songSelect_GUI = new ControlP5(this);
-  songSelect_GUI.addKnob("GAIN")
-                .setRange(-25, 5)
-                .setValue(-15)
-                .setPosition(25, height - 125)
-                .setRadius(50)
-                .setDragDirection(Knob.VERTICAL);
-  String[] s = new String[] {"BACKGROUND_BLOBS", "RGB_ENEMIES", "DO_POST_PROCESSING", "DO_CHROMA", "BACKGROUND_FADE", "DYNAMIC_BACKGROUND_COLOR", "DO_OBJ_RESET", "DO_SHAKE"};
-  for(int i = 0; i < s.length; i++) {
-    songSelect_GUI.addToggle(s[i])
-                  .setPosition(35, height - 45 * i - 180)
-                  .setSize(85, 25)
-                  .setColorBackground(color(255, 0, 0))
-                  .setColorForeground(color(255, 0, 0))
-                  .setColorActive(color(0, 255, 0));
-                  // .setValue(true)
-                  // .setMode(ControlP5.SWITCH);
-  }
-  songSelect_GUI.hide();
 
   f = new field(max(width, height));
   a = new arrow(width / 2, height / 2, 0, 500, 1700);
@@ -352,70 +404,60 @@ void setup() {
 }
 
 void draw() {
-  if(!focused) {
-    return;
-  }
+  if(!focused) return;
+  previousCursor = activeCursor;
 
   switch(gameState) {
     case "gameSelect": {
-      songSelect_GUI.show();
-      cursor();
-      rectMode(CORNER);
-      textFont(defaultFont, 15);
+      activeCursor = ARROW;
       background(0);
-      int expandSize = 150;
-      float sc = width / 9.0;
-      float dd = ((width - sc) - (9 * sc + 100)) / 2;
-      for(int i = 0; i < songList.size(); i++) {
-        int x = int(i % 10 * sc + dd); //Fun fact, mod is eval'd with the same ordering as multiplication and division
-        int y = int(i / 10 * sc + dd);
-        boolean inside = mouseX > x && mouseX < x + expandSize && mouseY > y + titleScroll && mouseY < y + titleScroll + expandSize;
-        pushMatrix();
-          translate(0, titleScroll);
-          fill(inside ? 200 : 100);
-          stroke(255);
-          strokeWeight(4);
-          rect(x, y, expandSize, expandSize, 15);
-          fill(32);
-          textAlign(CENTER);
-          text(songList.get(i), x + 5, y + 5, expandSize - 7, expandSize - 7);
-          if(mousePressed && inside) {
-            if(songList.get(i).equals("Add Song")) {
-              selectInput("Select a music file:", "songSelected");
-            }else{
-              if(songList.get(i).indexOf('\\') > -1 || songList.get(i).indexOf('/') > -1) {
-                songPath = songList.get(i);
-              }else{
-                songPath = "songs/" + songList.get(i);
-              }
-              String[] tmp = splitTokens(songList.get(i), "/\\");
+      imageMode(CENTER);
+      image(text_logo, width / 2, text_logo.height / 2);
+      textAlign(CENTER, CENTER);
+      gameSelect_songSelect_actual = Math.floorMod(gameSelect_songSelect_actual, songList.size());
+      gameSelect_songSelect = lerp(gameSelect_songSelect, gameSelect_songSelect_actual, 0.1);
 
-              gameState = "game";
-              resetEnemies();
-              resetLevel();
-              bubbles = new ArrayList();
-              for(int _ = 0; _ < 4; _++) {
-                bubbles.add(new bubble(vec2(s_random(0, width), s_random(0, height))));
+      float y_offset = 250;
+      int min_s = gameSelect_songSelect_actual - gameSelect_songDisplayCount;
+      int max_s = min(gameSelect_songSelect_actual + gameSelect_songDisplayCount, songList.size());
+      textFont(defaultFont, 50);
+
+      for(int i = min_s; i < max_s; i++) {
+        float fontSize = max(2, 50 - 10 * pow(abs(i - int(12 * gameSelect_songSelect) / 12.0), 0.85));
+        if(i >= 0) {
+          fill(255);
+          textSize(fontSize);
+          text(songList.get(i), width / 2, 250 + y_offset);
+          if(i == gameSelect_songSelect_actual) {
+            if(mouseX > width / 2 - (60 + textWidth(songList.get(i)) / 2.0) && mouseX < width / 2 + (60 + textWidth(songList.get(i)) / 2.0) && mouseY > 250 + y_offset + 6.75 - 27.5 && mouseY < 250 + y_offset + 6.75 + 27.5) {
+              mouseOverSong = true;
+              if(mousePressed) {
+                fill(255, 128, 128);
+                activeCursor = MOVE;
+              }else{
+                fill(255, 200, 200);
+                activeCursor = HAND;
               }
-              int randomSeed = trim(tmp[tmp.length - 1]).hashCode();
-              println("Random seed for \"" + songPath + "\": " + randomSeed);
-              randomSeed(randomSeed);
-              unimportantRandoms.setSeed(randomSeed);
-              song = minim.loadFile(songPath);
-              songPath = splitTokens(trim(tmp[tmp.length - 1]), ".")[0];
+            }else{
+              mouseOverSong = false;
+              fill(255);
             }
+            float sw = textWidth(songList.get(i)) / 2;
+            triangle(
+              width / 2 + sw + 15, 250 + y_offset + 6.75,
+              width / 2 + sw + 55, 250 + y_offset + 6.75 - 20,
+              width / 2 + sw + 55, 250 + y_offset + 6.75 + 20);
+            triangle(
+              width / 2 - sw - 15, 250 + y_offset + 6.75,
+              width / 2 - sw - 55, 250 + y_offset + 6.75 - 20,
+              width / 2 - sw - 55, 250 + y_offset + 6.75 + 20);
           }
-        popMatrix();
+        }
+        y_offset += fontSize + 5;
       }
-      if(gameState.equals("game")) {
-        songSelect_GUI.hide();
-        song.setGain(GAIN);
-        song.play();
-        fft = new FFT(song.bufferSize(), song.sampleRate());
-        
-        textAlign(LEFT);
-        noCursor();
-      }
+      // selectInput("Select a music file:", "songSelected");
+      // selectLevel()
+      
     } break;
 
     case "game": {
@@ -566,7 +608,9 @@ void draw() {
           cc.move();
         }
 
+        imageMode(CORNER);
         rectMode(CENTER);
+        activeCursor = -1;
 
         randTrans = DO_SHAKE ? vec2(s_random(10 * -c, 10 * c), s_random(10 * -c, 10 * c)) : vec2();
         ang += (0.001 + constrain(c / 75, 0, 0.05)) * (200 / frameRate);
@@ -669,10 +713,8 @@ void draw() {
         builder.compose();
         if(DO_CHROMA) {
           float prec = 0.75;
-          PVector nextChroma_r;
-          PVector nextChroma_g;
-          PVector nextChroma_b;
-          PVector zeroVector = new PVector(0.0, 0.0);
+          PVector nextChroma_r, nextChroma_g, nextChroma_b;
+          PVector zeroVector = vec2();
           if(intense) {
             if(c >= 1) {
               float offset = (2 * ((2 * c + 0.5) % 1) - 1) / 5;
@@ -706,6 +748,17 @@ void draw() {
         }
       }
 
+      if(DO_HIT_PROMPTS) {
+        textSize(24);
+        for(int i = floatingPrompts.size() - 1; i > -1; i--) {
+          floatingText o = floatingPrompts.get(i);
+          o.draw();
+          if(millis() > o.delTime) {
+            floatingPrompts.remove(i);
+          }
+        }
+      }
+
       colorMode(RGB);
       fill(144, 227, 154);
       textSize(50);
@@ -729,13 +782,30 @@ void draw() {
       }
 
       if(!song.isPlaying()) {
-        gameState = "levelSummary";
-        endScreenTimerOffset = millis();
-        textSFXPlaying = false;
-        screen = get(); //I can't figure out how to use just the back buffer because I'm tired and dumb so I'm doing this
-        back.beginDraw();
-        back.background(screen);
-        back.endDraw();
+        if(levelSummary_timer == 0) {
+          if(objs.size() > 0 && DO_HIT_PROMPTS) {
+            gainScore.play();
+            gainScore.rewind();
+            for(int i = objs.size() - 1; i > -1; i--) {
+              obj o = objs.get(i);
+              floatingPrompts.add(new floatingText(o.loc.x, o.loc.y, 1500, "+1"));
+              objs.remove(i);
+              score++;
+            }
+            levelSummary_timer = millis() + 2000;
+          }else{
+            levelSummary_timer = 1;
+          }
+        }else if(millis() > levelSummary_timer) {
+          levelSummary_timer = 0;
+          gameState = "levelSummary";
+          endScreenTimerOffset = millis();
+          textSFXPlaying = false;
+          screen = get(); //I can't figure out how to use just the back buffer because I'm tired and dumb so I'm doing this
+          back.beginDraw();
+          back.background(screen);
+          back.endDraw();
+        }
       }
     } break;
     case "levelSummary": {
@@ -763,7 +833,7 @@ void draw() {
         textSFX.rewind();
       }
 
-      cursor();
+      activeCursor = ARROW;
       background(0);
       if(frameCount % max(1, int(frameRate / 50)) == 0) {
         back.filter(reduceOpacity);
@@ -776,7 +846,7 @@ void draw() {
       textAlign(LEFT, CENTER);
       float titleWidth = textWidth(songPath) / 2;
       textFont(songFont, 40);
-      float calculatedScore = float(score) / (1 + float(hitCount) / 2.5) * sq(1.4 * (1.0 - songComplexity));
+      float calculatedScore = float(score) / (1 + sqrt(float(hitCount))) * pow(1.4 * (1.0 - songComplexity), 3);
       text("Score:\t\t " + adjustedScore + "\nHit Count:\t\t " + adjustedHitCount+"\nGrade:\t\t " + calculatedScore, width / 2 - titleWidth, height / 2.33);
 
       if(durationInto > 500) songEndScreenSkippable = true;
@@ -790,7 +860,7 @@ void draw() {
     } break;
   }
 
-  { //FPS Tracker
+  if(SHOW_FPS) { //FPS Tracker
     rectMode(CORNER);
     noStroke();
     fill(25, 128);
@@ -799,6 +869,14 @@ void draw() {
     textAlign(LEFT, CENTER);
     textSize(15);
     text("FPS: " + nf(round(frameRate), 4), width - 80, 10);
+  }
+
+  if(activeCursor != previousCursor) {
+    if(activeCursor == -1) {
+      noCursor();
+    }else{
+      cursor(activeCursor);
+    }
   }
 }
 
@@ -826,6 +904,19 @@ void keyPressed() {
         }
       } break;
     }
+  }else if(gameState.equals("gameSelect")) {
+    if(keyCode == UP) {
+      moveSongSel(-1);
+    }else if(keyCode == DOWN) {
+      moveSongSel(1);
+    }
+  }
+}
+void keyReleased() {
+  if(gameState.equals("gameSelect")) {
+    if(keyCode == ENTER || keyCode == 32) {
+      selectLevel(songList.get(gameSelect_songSelect_actual));
+    }
   }else if(gameState.equals("levelSummary")) {
     if(songEndScreenSkippable) {
       gameState = "gameSelect";
@@ -835,6 +926,12 @@ void keyPressed() {
     }
   }
 }
+void mouseClicked() {
+  if(mouseOverSong) {
+    mouseOverSong = false;
+    selectLevel(songList.get(gameSelect_songSelect_actual));
+  }
+}
 void mouseWheel(MouseEvent event) {
   float e = event.getCount();
   if(gameState == "game") {
@@ -842,7 +939,6 @@ void mouseWheel(MouseEvent event) {
     song.setGain(GAIN);
     hitSound.setGain(GAIN + 12);
   }else if(gameState == "gameSelect"){
-    titleScroll -= 25 * e;
-    objs = new ArrayList();
+    moveSongSel(int(e));
   }
 }
