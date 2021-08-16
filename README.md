@@ -1,3 +1,3 @@
-Requires: Minim, PostFX, controlP5
+Requires: Minim, PostFX
 
 Cannot be commercially used without permission

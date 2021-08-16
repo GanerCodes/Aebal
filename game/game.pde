@@ -29,7 +29,7 @@ Minim minim;
 FFT fft;
 color backColor, globalObjColor;
 PGraphics back, back2;
-PImage screen, text_logo, image_gear256;
+PImage screen, text_logo, image_gear256, image_back256;
 PFont defaultFont, songFont;
 PShader bubbleShader, chroma, reduceOpacity, grayScale;
 PostFX postProcessing;
@@ -113,6 +113,13 @@ void setScene(String scene) {
 
 void returnScene() {
   setScene(previousScene);
+}
+
+void gotoLevelSelect() {
+  if(song.sound != null) song.sound.close();
+  setScene("gameSelect");
+  resetLevel();
+  screenshot();
 }
 
 void setKeys(boolean state) {
@@ -211,7 +218,7 @@ void selectLevel(String songName) {
   resetLevel();
   bubbles = new ArrayList();
   floatingPrompts = new ArrayList();
-  for(int _ = 0; _ < 4; _++) {
+  for(int i = 0; i < 4; i++) {
     bubbles.add(new bubble(vec2(s_random(0, width), s_random(0, height))));
   }
   int randomSeed = trim(tmp[tmp.length - 1]).hashCode();
@@ -528,8 +535,9 @@ void setup() {
   gameSelect_songSelect = gameSelect_songSelect_actual;
 
   image_gear256 = loadImage("gear_256.png");
+  image_back256 = loadImage("backarrow_256.png");
   settings_button = new button(width - 65, height - 65, 85, 85, 5, image_gear256, color(45), color(75), color(128));
-  back_button = new button(65, 65, 85, 85, 5, color(45), color(75), color(128));
+  back_button = new button(65, height - 65, 85, 85, 5, image_back256, color(45), color(75), color(128));
 
   defaultFont = createFont("defaultFont.ttf", 128);
   songFont = createFont("songFont.ttf", 64);
@@ -614,6 +622,7 @@ void draw() {
         y_offset += fontSize + 5;
       }
       settings_button.draw();
+      back_button.draw();
 
       // selectInput("Select a music file:", "songSelected");
       // selectLevel()
@@ -977,8 +986,9 @@ void draw() {
       //
       textFont(songFont, 48);
       textAlign(CENTER, CENTER);
-      text("<Press esc to return to game>", width / 2, height / 1.2);
+      text("<Press esc to return to game>", width / 2, height / 1.45);
       settings_button.draw();
+      back_button.draw();
 
     } break;
     case "settings": {
@@ -1086,10 +1096,7 @@ void keyPressed() {
   if(key == ESC) {
     key = 0;
     if(gameState.equals("levelSummary") || ((gameState.equals("game") || gameState.equals("pause") || gameState.equals("settings")) && keydown_SHIFT)) {
-      if(song.sound != null) song.sound.close();
-      setScene("gameSelect");
-      resetLevel();
-      screenshot();
+      gotoLevelSelect();
     }else if(gameState.equals("game")) {
       pause(false);
       screenshot();
@@ -1143,14 +1150,15 @@ void keyReleased() {
   }
 }
 void mousePressed() {
-  if(gameState.equals("pause") || gameState.equals("gameSelect")) {
-    settings_button.checkMouse(MOUSE_PRESS);
-  }else if(gameState.equals("settings")) {
+  if(gameState.equals("settings")) {
     for(button b : settings) {
       b.checkMouse(MOUSE_PRESS);
     }
     volSlider.checkMouse(MOUSE_PRESS);
+  }
+  if(gameState.equals("pause") || gameState.equals("gameSelect") || gameState.equals("settings")) {
     back_button.checkMouse(MOUSE_PRESS);
+    if(!gameState.equals("settings")) settings_button.checkMouse(MOUSE_PRESS);
   }
 }
 void mouseReleased() {
@@ -1160,7 +1168,8 @@ void mouseReleased() {
       setScene("settings");
       unpause(false);
     }
-  }else if(gameState.equals("settings")) {
+  }
+  if(gameState.equals("settings")) {
     for(button b : settings) {
       b.checkMouse(MOUSE_RELEASE);
     }
@@ -1169,6 +1178,14 @@ void mouseReleased() {
       screenshot();
       returnScene();
       setGlobalVolume(volSlider.val);
+    }
+  }else if(gameState.equals("gameSelect")) {
+    if(back_button.active && back_button.checkMouse(MOUSE_RELEASE)) {
+      exit();
+    }
+  }else if(gameState.equals("pause")) {
+    if(back_button.active && back_button.checkMouse(MOUSE_RELEASE)) {
+      gotoLevelSelect();
     }
   }
 }
