@@ -23,7 +23,7 @@ String songPath, previousScene;
 boolean keydown_SHIFT;
 PVector pos, randTrans, chroma_r, chroma_g, chroma_b;
 StringList songList, songListShorthands;
-Sound song, hitSound, textSFX, songSelChange, gainScore;
+Sound song, hitSound, buttonSFX, textSFX, volChangeSFX, songSelChange, gainScore;
 Sound[] soundList;
 Minim minim;
 FFT fft;
@@ -482,9 +482,11 @@ void setup() {
 
   minim = new Minim(this);
   soundList = new Sound[] {
-    hitSound      = new Sound(minim.loadFile("hit.wav"          ), -3 ),
-    gainScore     = new Sound(minim.loadFile("gainScore.wav"    ),  20),
     songSelChange = new Sound(minim.loadFile("songSelChange.wav"), -15),
+    volChangeSFX  = new Sound(minim.loadFile("volChange.wav" ), -12),
+    buttonSFX     = new Sound(minim.loadFile("button.wav"       ), -12),
+    gainScore     = new Sound(minim.loadFile("gainScore.wav"    ),  20),
+    hitSound      = new Sound(minim.loadFile("hit.wav"          ), -3 ),
     textSFX       = new Sound(minim.loadFile("textSFX.wav"      ), -18),
     song          = new Sound(-20)
   };

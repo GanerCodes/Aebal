@@ -56,7 +56,10 @@ class button {
     boolean checkMouse(int type) {
         boolean over = mouseX > x - w/2 && mouseX < x + w/2 && mouseY > y - h/2 && mouseY < y + h/2;
         if(over && active && type == MOUSE_RELEASE && over_1 != -1) state = !state;
-        if(type > 0) active = type == MOUSE_PRESS && over; //this line is sex
+        if(type > 0) {
+            active = type == MOUSE_PRESS && over;
+            if(over && type == MOUSE_RELEASE) buttonSFX.playR();
+        }
         return over;
     }
     void draw() {
@@ -113,7 +116,12 @@ class slider {
     boolean checkMouse(int type) {
         float offsetX = w / 2 - h / 2;
         boolean over = (mouseX > x - offsetX && mouseX < x + offsetX && mouseY > y - h / 2 && mouseY < y + h / 2) || dist(mouseX, mouseY, getMappedVal(), y) < h / 2 * ballHfactor || dist(mouseX, mouseY, x - offsetX, y) < h / 2 || dist(mouseX, mouseY, x + offsetX, y) < h / 2;
+        boolean pre_active = active;
         if(type > 0) active = type == MOUSE_PRESS && over; //this line is sex
+        if(pre_active && !active) {
+            setGlobalVolume(volSlider.val);
+            volChangeSFX.playR();
+        }
         return over;
     }
     void draw() {
