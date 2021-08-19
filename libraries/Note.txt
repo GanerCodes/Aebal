@@ -1,1 +1,3 @@
 If you're lazy just drag these into your documents/processing/libraries folder
+
+None of the content in this folder is written by me
