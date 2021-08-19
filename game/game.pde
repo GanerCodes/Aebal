@@ -20,7 +20,7 @@ boolean intense, textSFXPlaying, songEndScreenSkippable, mouseOverSong, paused, 
 int score, hitCount, durationInto, song_intensity_count, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1;
 float gameSelect_songSelect, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, song_total_intensity, millisDelta, grayScaleTimer = 100;
 String songPath, previousScene;
-boolean keydown_SHIFT;
+boolean keydown_SHIFT, DO_ENEMY_SPAWNING = false;
 PVector pos, randTrans, chroma_r, chroma_g, chroma_b;
 StringList songList, songListShorthands;
 Sound song, hitSound, buttonSFX, textSFX, volChangeSFX, songSelChange, gainScore;
@@ -29,7 +29,7 @@ Minim minim;
 FFT fft;
 color backColor, globalObjColor;
 PGraphics back, back2;
-PImage screen, text_logo, image_gear256, image_back256;
+PImage screen, text_logo, image_gear256, image_back256, image_settings, image_paused;
 PFont defaultFont, songFont;
 PShader bubbleShader, chroma, reduceOpacity, grayScale;
 PostFX postProcessing;
@@ -78,6 +78,16 @@ float[] rectAngleMap(float a, float w, float h) {
     (w * cosA) / div, 
     (h * sinA) / div
   };
+}
+
+boolean lineIntersection(PVector a, PVector b, PVector c, PVector d) {
+  return (b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x)>=0?(d.x-c.x)*(b.y-c.y)-(d.y-c.y)*(b.x-c.x)>=0&&(b.x-a.x)*(d.y-a.y)-(b.y-a.y)*(d.x-a.x)<=0&&(d.x-c.x)*(a.y-c.y)-(d.y-c.y)*(a.x-c.x)<=0:(d.x-c.x)*(b.y-c.y)-(d.y-c.y)*(b.x-c.x)<=0&&(b.x-a.x)*(d.y-a.y)-(b.y-a.y)*(d.x-a.x)>=0&&(d.x-c.x)*(a.y-c.y)-(d.y-c.y)*(a.x-c.x)>=0;
+}
+boolean rectIntersection(PVector loc, float s, PVector a, PVector b) {
+  return lineIntersection(vec2(loc.x - s / 2, loc.y - s / 2), vec2(loc.x + s / 2, loc.y - s / 2), a, b) || 
+  lineIntersection(vec2(loc.x + s / 2, loc.y - s / 2), vec2(loc.x + s / 2, loc.y + s / 2), a, b) || 
+  lineIntersection(vec2(loc.x + s / 2, loc.y + s / 2), vec2(loc.x - s / 2, loc.y + s / 2), a, b) || 
+  lineIntersection(vec2(loc.x - s / 2, loc.y + s / 2), vec2(loc.x - s / 2, loc.y - s / 2), a, b);
 }
 
 void moveSongSel(int a) {
@@ -207,6 +217,10 @@ String fileName(String path) {
 }
 
 void selectLevel(String songName) {
+  if(songName.equals("///addSong")) {
+    selectInput("Select a music file:", "songSelected");
+    return;
+  }
   if(songName.indexOf('\\') > -1 || songName.indexOf('/') > -1) {
     songPath = songName;
   }else{
@@ -236,7 +250,9 @@ void selectLevel(String songName) {
 }
 
 void songSelected(File file) {
+  if(file == null) return;
   songList.insert(songList.size() - 1, file.getAbsolutePath());
+  songListShorthands.insert(songListShorthands.size() - 1, fileName(file.getAbsolutePath()));
 }
 
 float adjMillis() {
@@ -370,7 +386,12 @@ class arrow {
     rot += 0.05 * (60 / frameRate);
     d1 = -mn - (sz) * (cos(rot) + 1);
     //TODO: make this use something other than an arbitrarily defined circle for hit detection
-    if(oT > 120 && dist(x + cos(a) * (d1 - 15), y + sin(a) * (d1 - 15), pos.x, pos.y) <= 30) {
+    // if(oT > 120 && dist(x + cos(a) * (d1 - 15), y + sin(a) * (d1 - 15), pos.x, pos.y) <= 30) {
+    PVector org = vec2(x + cos(a) * d1, y + sin(a) * d1);
+    if(oT > 120 && (
+      rectIntersection(pos, 20, org, PVector.add(org, PVector.fromAngle(a + FIFTH_PI).mult(30))) || 
+      rectIntersection(pos, 20, org, PVector.add(org, PVector.fromAngle(a - FIFTH_PI).mult(30)))
+    )) {
       if(noScoreTimer <= 0) {
         gotHit(getOnScreenObjCount() * 2 + 3, 60, true, 2);
         if(!NO_DAMAGE.state) floatingPrompts.add(new floatingText(x + cos(a) * d1, y + sin(a) * d1, 2250, "-3"));
@@ -518,21 +539,27 @@ void setup() {
 
   for(int i = 0; i < settings_left.length; i++) {
     settings_left[i].x = 100;
-    settings_left[i].y = height / 2 - settings_left.length   * 50 + i * 100;
+    settings_left[i].y = height / 1.65 - settings_left.length   * 50 + i * 100;
   }
   for(int i = 0; i < settings_right.length; i++) {
     settings_right[i].x = width - 100;
-    settings_right[i].y = height / 2 - settings_right.length * 50 + i * 100;
+    settings_right[i].y = height / 1.65 - settings_right.length * 50 + i * 100;
   }
 
   volSlider = new slider(width / 2, height / 1.175, 600, 35, 0, -30, 20, "Volume", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
 
-  text_logo = loadImage("aebal_text.png");
+  text_logo      = loadImage("aebal_text.png");
+  image_settings = loadImage("settings.png"  );
+  image_paused   = loadImage("paused.png"    );
   songList = new StringList(new File(dataPath("songs")).list());
   songListShorthands = new StringList();
   for(String s : songList) {
     songListShorthands.append(fileName(s));
   }
+
+  songList.append("///addSong");
+  songListShorthands.append("+ Add Song");
+
   gameSelect_songSelect_actual = songList.size() / 2;
   gameSelect_songSelect = gameSelect_songSelect_actual;
 
@@ -625,10 +652,6 @@ void draw() {
       }
       settings_button.draw();
       back_button.draw();
-
-      // selectInput("Select a music file:", "songSelected");
-      // selectLevel()
-
       
     } break;
 
@@ -649,7 +672,7 @@ void draw() {
     
       intense = f.size <= 505;
       { //Physics
-        if (objSpawnTimer <= 0) { //Object spawning
+        if (objSpawnTimer <= 0 && DO_ENEMY_SPAWNING) { //Object spawning
           float speed = random(5, 12) * (1 + 3.5 * c);
           
           float v = min(height, f.size * 1.5) / 2;
@@ -791,6 +814,7 @@ void draw() {
         ang += (0.001 + constrain(c / 75, 0, 0.05)) * (200 / frameRate);
         a.speed = constrain(a.speed * (1 + constrain((c - targetComplexity) / 100, -0.05, 0.05)), 0.5, 1.75);
         float dfc = sqrt(sq(width) + sq(height));
+        
         a.x = cos(ang) * dfc + width / 2;
         a.y = sin(ang) * dfc + height / 2;
         a.a = atan2(a.y - height / 2, a.x - width / 2);
@@ -981,11 +1005,9 @@ void draw() {
       activeCursor = ARROW;
       textAlign(CENTER, CENTER);
       fadeBack(1, 255);
-      //replace with an image
-      textFont(songFont, 150);
       fill(255);
-      text("Paused", width / 2, 132);
-      //
+      imageMode(CENTER);
+      image(image_settings, width / 2, 123, width / 2, width / 2 * (float(image_settings.height) / image_settings.width));
       textFont(songFont, 48);
       textAlign(CENTER, CENTER);
       text("<Press esc to return to game>", width / 2, height / 1.45);
@@ -997,11 +1019,11 @@ void draw() {
       activeCursor = ARROW;
       textAlign(CENTER, CENTER);
       fadeBack(1, 255);
-      textFont(songFont, 140);
       fill(255);
-      text("Settings", width / 2, 132);
+      imageMode(CENTER);
+      image(image_paused, width / 2, 123, width / 2, width / 2 * (float(image_paused.height) / image_paused.width));
       
-      textSize(32);
+      textFont(defaultFont, 32);
       textAlign(LEFT, CENTER);
       for(button b : settings_left) {
         b.draw();
