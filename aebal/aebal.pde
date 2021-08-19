@@ -43,6 +43,7 @@ arrow a;
 button[] settings, settings_left, settings_right;
 button settings_button, back_button, DYNAMIC_BACKGROUND_COLOR, DO_POST_PROCESSING, BACKGROUND_BLOBS, BACKGROUND_FADE, DO_HIT_PROMPTS, NO_DAMAGE, RGB_ENEMIES, DO_CHROMA, DO_SHAKE, SHOW_FPS;
 slider volSlider;
+PVector[] previousPos;
 
 //Math related constants
 float FIFTH_PI = 0.62831853071;
@@ -502,7 +503,6 @@ void setup() {
   surface.setTitle("Aebal");
 
   unimportantRandoms = new Random();
-  pos = new PVector(width / 2, height / 2);
 
   minim = new Minim(this);
   soundList = new Sound[] {
@@ -592,9 +592,23 @@ void setup() {
   postProcessing = new PostFX(this);
   postProcessing.preload(BloomPass.class);
   postProcessing.preload(SaturationVibrancePass.class);
+
+  pos = vec2(width / 2, height / 2);
+  previousPos = new PVector[1];
+  for(int i = 0; i < previousPos.length; i++) {
+    previousPos[i] = pos.copy();
+  }
+}
+
+import java.awt.MouseInfo;
+import java.awt.Point;
+
+void mouseMoved() {
+  println("mouseMoved():", mouseX, mouseY);
 }
 
 void draw() {
+  println("draw():", mouseX, mouseY);
   if(focused) {
     if(paused) unpause(true);
   }else{
@@ -659,6 +673,7 @@ void draw() {
     } break;
 
     case "game": {
+      println(mouseX, mouseY);
       fft.forward(song.sound.mix);
       float tmp_intensity = findComplexity(song.sound.mix.toArray()) * (0.65 + song.sound.mix.level());
       c = tmp_intensity * (targetComplexity / songComplexity);
@@ -666,9 +681,12 @@ void draw() {
       song_intensity_count++;
       noScoreTimer -= (60 / frameRate);
       objSpawnTimer -= c * 2 * (60 / frameRate);
-    
-      PVector pre_pos = pos.copy();
-      pos.set(lerp(pos.x, mouseX, 0.5), lerp(pos.y, mouseY, 0.5));
+
+      for(int i = 0; i < previousPos.length - 1; i++) {
+        previousPos[i] = previousPos[i + 1];
+      }
+      previousPos[previousPos.length - 1] = pos.copy();
+      pos.set(mouseX, mouseY);
     
       f.size = constrain(f.size - constrain(pow(15 * (c - 0.25), 3), -100, 25) * (60 / frameRate), 500, max(width, height));
       f.update();
@@ -868,7 +886,10 @@ void draw() {
         back.fill(255);
         back.stroke(255);
         back.strokeWeight(5);
-        back.line(pre_pos.x, pre_pos.y, pos.x, pos.y);
+        back.noFill();
+        back.strokeCap(ROUND);
+        back.line(previousPos[previousPos.length - 1].x, previousPos[previousPos.length - 1].y, pos.x, pos.y);
+        back.strokeCap(PROJECT);
       }
       colorMode(HSB);
       globalObjColor = lerpColor(globalObjColor, (intense && RGB_ENEMIES.state) ? color((adjMillis() / 5.0) % 255, 164, 255) : color(0, 255, 255), 4.0 / frameRate);
@@ -1234,7 +1255,7 @@ void mouseWheel(processing.event.MouseEvent event) {
   float e = -((com.jogamp.newt.event.MouseEvent)event.getNative()).getRotation()[1]; //JAVA MOMENT
   if(e == 0) return;
   if(gameState.equals("game") || (gameState.equals("settings") && volSlider.checkMouse(MOUSE_OVER))) {
-    volSlider.val = constrain(volSlider.val - e, volSlider.val_min, volSlider.val_max);
+    volSlider.val = constrain(volSlider.val + e, volSlider.val_min, volSlider.val_max);
     setGlobalVolume(volSlider.val);
   }else if(gameState.equals("gameSelect")) {
     if(millis() > scrollWait) {
