@@ -1,10 +1,11 @@
+import com.jogamp.newt.event.MouseEvent;
 import ch.bildspur.postfx.builder.*;
 import ch.bildspur.postfx.pass.*;
 import ch.bildspur.postfx.*;
+import ddf.minim.analysis.*;
+import ddf.minim.*;
 import java.lang.Math;
 import java.io.File;
-import ddf.minim.*;
-import ddf.minim.analysis.*;
 
 float FPS = 1000;
 float songComplexity = 0.2; //How "Complex" the current song is, aka make this higher if your song is really loud/bassy
@@ -18,7 +19,7 @@ String gameState = "gameSelect";
 //General vars
 boolean intense, textSFXPlaying, songEndScreenSkippable, mouseOverSong, paused, show_fade_in = true;
 int score, hitCount, durationInto, song_intensity_count, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1;
-float gameSelect_songSelect, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, song_total_intensity, millisDelta, grayScaleTimer = 100;
+float scrollWait, gameSelect_songSelect, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, song_total_intensity, millisDelta, grayScaleTimer = 100;
 String songPath, previousScene;
 boolean keydown_SHIFT, DO_ENEMY_SPAWNING = true;
 PVector pos, randTrans, chroma_r, chroma_g, chroma_b;
@@ -216,6 +217,15 @@ String fileName(String path) {
   return new File(path).getName().replaceFirst("[.][^.]+$", "");
 }
 
+void loadSong() {
+  song.setSound(minim.loadFile(songPath));
+  song.setDefaultVolume(-20);
+  song.sound.play();
+  fft = new FFT(song.sound.bufferSize(), song.sound.sampleRate());
+  songPath = fileName(songPath);
+  setScene("game");
+}
+
 void selectLevel(String songName) {
   if(songName.equals("///addSong")) {
     selectInput("Select a music file:", "songSelected");
@@ -227,7 +237,7 @@ void selectLevel(String songName) {
     songPath = "songs/" + songName;
   }
   String[] tmp = splitTokens(songName, "/\\");
-  setScene("game");
+  setScene("loading");
   resetEnemies(0);
   resetLevel();
   bubbles = new ArrayList();
@@ -239,14 +249,7 @@ void selectLevel(String songName) {
   println("Random seed for \"" + songPath + "\": " + randomSeed);
   randomSeed(randomSeed);
   unimportantRandoms.setSeed(randomSeed);
-  song.setSound(minim.loadFile(songPath));
-  song.setDefaultVolume(-20);
-  songPath = fileName(songPath);
-
-  song.sound.play();
-  fft = new FFT(song.sound.bufferSize(), song.sound.sampleRate());
-  
-  textAlign(LEFT);
+  thread("loadSong");
 }
 
 void songSelected(File file) {
@@ -1038,6 +1041,13 @@ void draw() {
       volSlider.draw();
       back_button.draw();
     } break;
+    case "loading": {
+      background(0);
+      fill(255);
+      textFont(songFont, 60);
+      textAlign(CENTER, CENTER);
+      text("Loading...", width / 2, height / 2);
+    } break;
     case "levelSummary": {
       int adjustedScoreDuration    = min(1500, 100 * score   );
       int adjustedHitCountDuration = min(1500, 100 * hitCount);
@@ -1219,12 +1229,17 @@ void mouseClicked() {
     selectLevel(songList.get(gameSelect_songSelect_actual));
   }
 }
-void mouseWheel(MouseEvent event) {
-  float e = event.getCount();
+
+void mouseWheel(processing.event.MouseEvent event) {
+  float e = -((com.jogamp.newt.event.MouseEvent)event.getNative()).getRotation()[1]; //JAVA MOMENT
+  if(e == 0) return;
   if(gameState.equals("game") || (gameState.equals("settings") && volSlider.checkMouse(MOUSE_OVER))) {
     volSlider.val = constrain(volSlider.val - e, volSlider.val_min, volSlider.val_max);
     setGlobalVolume(volSlider.val);
   }else if(gameState.equals("gameSelect")) {
-    moveSongSel(int(e));
+    if(millis() > scrollWait) {
+      scrollWait = millis() + max(5, map(sq(e), 0, 0.3, 150, 0));
+      moveSongSel(int(abs(e) >= 1 ? e : e / abs(e)));
+    }
   }
 }
