@@ -5,6 +5,7 @@ import ch.bildspur.postfx.*;
 import ddf.minim.analysis.*;
 import ddf.minim.*;
 import java.lang.Math;
+import java.util.Map;
 import java.io.File;
 
 float FPS = 1000;
@@ -15,13 +16,15 @@ int gameSelect_songDisplayCount = 5;
 String gameState = "gameSelect";
 
 
-
 //General vars
+boolean DO_ENEMY_SPAWNING      = true;
+float   TIMER_UPDATE_FREQUENCY = 500;
+
 boolean intense, textSFXPlaying, songEndScreenSkippable, mouseOverSong, paused, show_fade_in = true;
 int score, hitCount, durationInto, song_intensity_count, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1;
 float scrollWait, gameSelect_songSelect, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, song_total_intensity, millisDelta, grayScaleTimer = 100;
 String songPath, previousScene;
-boolean keydown_SHIFT, DO_ENEMY_SPAWNING = true;
+boolean keydown_SHIFT, checkTimes;
 PVector pos, randTrans, chroma_r, chroma_g, chroma_b;
 StringList songList, songListShorthands;
 Sound song, hitSound, buttonSFX, textSFX, volChangeSFX, songSelChange, gainScore;
@@ -33,15 +36,18 @@ PGraphics back, back2;
 PImage screen, text_logo, image_gear256, image_back256, image_settings, image_paused;
 PFont defaultFont, songFont;
 PShader bubbleShader, chroma, reduceOpacity, grayScale;
+DecimalFormat timerFormat;
 PostFX postProcessing;
 PostFXBuilder postProcessingBuilder;
 ArrayList<obj> objs = new ArrayList();
 ArrayList<bubble> bubbles = new ArrayList();
 ArrayList<floatingText> floatingPrompts = new ArrayList();
+HashMap<String, Long> timingList;
+HashMap<String, String> timingDisplay;
 field f;
 arrow a;
 button[] settings, settings_left, settings_right;
-button settings_button, back_button, DYNAMIC_BACKGROUND_COLOR, DO_POST_PROCESSING, BACKGROUND_BLOBS, BACKGROUND_FADE, DO_HIT_PROMPTS, NO_DAMAGE, RGB_ENEMIES, DO_CHROMA, DO_SHAKE, SHOW_FPS;
+button settings_button, back_button, DEBUG_TIMINGS, DYNAMIC_BACKGROUND_COLOR, DO_POST_PROCESSING, BACKGROUND_BLOBS, BACKGROUND_FADE, DO_HIT_PROMPTS, NO_DAMAGE, RGB_ENEMIES, DO_CHROMA, DO_SHAKE, SHOW_FPS;
 slider volSlider;
 PVector[] previousPos;
 
@@ -235,7 +241,7 @@ void selectLevel(String songName) {
   if(songName.indexOf('\\') > -1 || songName.indexOf('/') > -1) {
     songPath = songName;
   }else{
-    songPath = "songs/" + songName;
+    songPath = sketchPath("songs/" + songName);
   }
   String[] tmp = splitTokens(songName, "/\\");
   setScene("loading");
@@ -325,7 +331,7 @@ class bubble {
   PVector loc, vel;
   PGraphics effect;
   float timer_offset;
-  int size = 1000;
+  int size = 750;
   bubble(PVector loc) {
     effect = createGraphics(size, size, P2D);
     this.loc = loc;
@@ -346,10 +352,8 @@ class bubble {
     vel.sub(adv.div(bubbles.size()).sub(loc).normalize().div(125));
 
     float adjSize = size / 2;
-    if(loc.x > width  + adjSize) { loc.x = -adjSize; }
-    if(loc.y > height + adjSize) { loc.y = -adjSize; }
-    if(loc.x < -adjSize) { loc.x = width  + adjSize; }
-    if(loc.y < -adjSize) { loc.y = height + adjSize; }
+    if(loc.x > width  + adjSize) { loc.x = -adjSize; } else if(loc.x < -adjSize) { loc.x = width  + adjSize; }
+    if(loc.y > height + adjSize) { loc.y = -adjSize; } else if(loc.y < -adjSize) { loc.y = height + adjSize; }
   }
   void draw(PGraphics base) {
     effect.beginDraw();
@@ -468,7 +472,7 @@ class obj {
     }
   }
   void draw(PGraphics base) {
-    base.ellipse(loc.x, loc.y, 20, 20);
+    base.circle(loc.x, loc.y, 20);
   }
 }
 
@@ -493,9 +497,9 @@ class floatingText {
 }
 
 void settings() {
-  fullScreen(P2D, 2);
+  fullScreen(P2D, 3);
   smooth(4);
-  PJOGL.setIcon("aebal.png");
+  PJOGL.setIcon(sketchPath("assets/images/aebal.png"));
 }
 
 void setup() {
@@ -503,15 +507,21 @@ void setup() {
   surface.setTitle("Aebal");
 
   unimportantRandoms = new Random();
+  timingList    = new HashMap();
+  timingDisplay = new HashMap();
+  timerFormat = new DecimalFormat("##.####");
+  timerFormat.setMinimumIntegerDigits(2);
+  timerFormat.setMinimumFractionDigits(4);
+
 
   minim = new Minim(this);
   soundList = new Sound[] {
-    songSelChange = new Sound(minim.loadFile("songSelChange.wav"), -15),
-    volChangeSFX  = new Sound(minim.loadFile("volChange.wav" ), -12),
-    buttonSFX     = new Sound(minim.loadFile("button.wav"       ), -12),
-    gainScore     = new Sound(minim.loadFile("gainScore.wav"    ),  20),
-    hitSound      = new Sound(minim.loadFile("hit.wav"          ), -3 ),
-    textSFX       = new Sound(minim.loadFile("textSFX.wav"      ), -18),
+    songSelChange = new Sound(minim.loadFile(sketchPath("assets/SFX/songSelChange.wav")), -15),
+    volChangeSFX  = new Sound(minim.loadFile(sketchPath("assets/SFX/volChange.wav"    )), -12),
+    buttonSFX     = new Sound(minim.loadFile(sketchPath("assets/SFX/button.wav"       )), -12),
+    gainScore     = new Sound(minim.loadFile(sketchPath("assets/SFX/gainScore.wav"    )),  20),
+    hitSound      = new Sound(minim.loadFile(sketchPath("assets/SFX/hit.wav"          )), -3 ),
+    textSFX       = new Sound(minim.loadFile(sketchPath("assets/SFX/textSFX.wav"      )), -18),
     song          = new Sound(-20)
   };
   textSFX.sound.setLoopPoints(20, 500);
@@ -533,7 +543,8 @@ void setup() {
     DO_POST_PROCESSING       = new button(0, 0, 75, 75, 5, "Shaders"             , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     BACKGROUND_BLOBS         = new button(0, 0, 75, 75, 5, "Background Blobs"    , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     BACKGROUND_FADE          = new button(0, 0, 75, 75, 5, "Background Fade"     , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
-    DO_HIT_PROMPTS           = new button(0, 0, 75, 75, 5, "Score Ticks"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active)
+    DO_HIT_PROMPTS           = new button(0, 0, 75, 75, 5, "Score Ticks"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
+    DEBUG_TIMINGS            = new button(0, 0, 75, 75, 5, "Timing Info"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active)
   };
   NO_DAMAGE.state = false;
 
@@ -551,10 +562,13 @@ void setup() {
 
   volSlider = new slider(width / 2, height / 1.175, 600, 35, 0, -30, 20, "Volume", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
 
-  text_logo      = loadImage("aebal_text.png");
-  image_settings = loadImage("settings.png"  );
-  image_paused   = loadImage("paused.png"    );
-  songList = new StringList(new File(dataPath("songs")).list());
+  image_back256  = loadImage(sketchPath("assets/Images/backarrow_256.png"));
+  text_logo      = loadImage(sketchPath("assets/Images/aebal_text.png"   ));
+  image_gear256  = loadImage(sketchPath("assets/Images/gear_256.png"     ));
+  image_settings = loadImage(sketchPath("assets/Images/settings.png"     ));
+  image_paused   = loadImage(sketchPath("assets/Images/paused.png"       ));
+
+  songList = new StringList(new File(sketchPath("Songs")).list());
   songListShorthands = new StringList();
   for(String s : songList) {
     songListShorthands.append(fileName(s));
@@ -566,26 +580,23 @@ void setup() {
   gameSelect_songSelect_actual = songList.size() / 2;
   gameSelect_songSelect = gameSelect_songSelect_actual;
 
-  image_gear256 = loadImage("gear_256.png");
-  image_back256 = loadImage("backarrow_256.png");
   settings_button = new button(width - 65, height - 65, 85, 85, 5, image_gear256, color(45), color(75), color(128));
   back_button = new button(65, height - 65, 85, 85, 5, image_back256, color(45), color(75), color(128));
 
-  defaultFont = createFont("defaultFont.ttf", 128);
-  songFont = createFont("songFont.ttf", 64);
+  defaultFont = createFont(sketchPath("assets/fonts/defaultFont.ttf"), 128);
+  songFont    = createFont(sketchPath("assets/fonts/songFont.ttf"   ), 64 );
 
   back  = createGraphics(width, height, P2D);
   back2 = createGraphics(width, height, P2D);
 
   strokeCap(PROJECT);
-  textFont(createFont("font.ttf", 64));
 
   f = new field(max(width, height));
   a = new arrow(width / 2, height / 2, 0, 500, 1700);
-  reduceOpacity = loadShader("reduceOpacity.glsl");
-  bubbleShader = loadShader("bubble.glsl");
-  grayScale = loadShader("gray.glsl");
-  chroma = loadShader("rgb_offset.glsl");
+  chroma =        loadShader(sketchPath("assets/shaders/rgb_offset.glsl"   ));
+  grayScale =     loadShader(sketchPath("assets/shaders/gray.glsl"         ));
+  bubbleShader =  loadShader(sketchPath("assets/shaders/bubble.glsl"       ));
+  reduceOpacity = loadShader(sketchPath("assets/shaders/reduceOpacity.glsl"));
   chroma_r = vec2();
   chroma_g = vec2();
   chroma_b = vec2();
@@ -600,21 +611,21 @@ void setup() {
   }
 }
 
-import java.awt.MouseInfo;
-import java.awt.Point;
-
-void mouseMoved() {
-  println("mouseMoved():", mouseX, mouseY);
-}
-
 void draw() {
-  println("draw():", mouseX, mouseY);
   if(focused) {
     if(paused) unpause(true);
   }else{
     if(!paused) pause(true);
     return;
   }
+
+  if(millis() > timerUpdateTime) {
+    checkTimes = true;
+    timerUpdateTime = millis() + TIMER_UPDATE_FREQUENCY;
+  }else{
+    checkTimes = false;
+  }
+
   previousCursor = activeCursor;
   durationInto = int(adjMillis() - sceneOffsetMillis);
 
@@ -673,7 +684,7 @@ void draw() {
     } break;
 
     case "game": {
-      println(mouseX, mouseY);
+      TT("Physics");
       fft.forward(song.sound.mix);
       float tmp_intensity = findComplexity(song.sound.mix.toArray()) * (0.65 + song.sound.mix.level());
       c = tmp_intensity * (targetComplexity / songComplexity);
@@ -692,6 +703,7 @@ void draw() {
       f.update();
     
       intense = f.size <= 505;
+
       { //Physics
         if (objSpawnTimer <= 0 && DO_ENEMY_SPAWNING) { //Object spawning
           float speed = random(5, 12) * (1 + 3.5 * c);
@@ -855,6 +867,7 @@ void draw() {
         }
         score = max(0, score);
       }
+      TT("Physics");
       
       if(DYNAMIC_BACKGROUND_COLOR.state) {
         colorMode(HSB);
@@ -866,9 +879,13 @@ void draw() {
       }else{
         background(0);
       }
+
       if(BACKGROUND_FADE.state && frameCount % max(1, int(frameRate / 200)) == 0) {
+        TT("Fade");
         back.filter(reduceOpacity);
+        TT("Fade");
       }
+
       back.beginDraw();
       back.imageMode(CENTER);
       back.noStroke();
@@ -877,19 +894,19 @@ void draw() {
         back.background(backColor);
       }
       if(BACKGROUND_BLOBS.state) {
+        TT("Blobs");
         for(bubble b : bubbles) {
           b.draw(back);
         }
+        TT("Blobs");
       }
 
+      TT("Enemies+");
       if(BACKGROUND_FADE.state) {
         back.fill(255);
         back.stroke(255);
         back.strokeWeight(5);
-        back.noFill();
-        back.strokeCap(ROUND);
         back.line(previousPos[previousPos.length - 1].x, previousPos[previousPos.length - 1].y, pos.x, pos.y);
-        back.strokeCap(PROJECT);
       }
       colorMode(HSB);
       globalObjColor = lerpColor(globalObjColor, (intense && RGB_ENEMIES.state) ? color((adjMillis() / 5.0) % 255, 164, 255) : color(0, 255, 255), 4.0 / frameRate);
@@ -924,14 +941,17 @@ void draw() {
         stroke(255);
         f.draw();
       } popMatrix();
+      TT("Enemies+");
 
       //post processing
       if(DO_POST_PROCESSING.state) {
+        TT("PostFX");
         postProcessingBuilder = postProcessing.render().bloom(0.5, 20, 40);
         if(intense) {
           postProcessingBuilder.saturationVibrance(0.4 + c / 3.0, 0.4 + c / 3.0);
         }
         postProcessingBuilder.compose();
+        TT("PostFX");
         if(DO_CHROMA.state) {
           float prec = 0.75;
           PVector nextChroma_r, nextChroma_g, nextChroma_b;
@@ -965,7 +985,9 @@ void draw() {
           chroma.set("r", chroma_r.x, chroma_r.y);
           chroma.set("g", chroma_g.x, chroma_g.y);
           chroma.set("b", chroma_b.x, chroma_b.y);
+          TT("ChromaAbbr");
           filter(chroma);
+          TT("ChromaAbbr");
         }
       }
 
@@ -1031,7 +1053,7 @@ void draw() {
       fadeBack(1, 255);
       fill(255);
       imageMode(CENTER);
-      image(image_settings, width / 2, 123, width / 2, width / 2 * (float(image_settings.height) / image_settings.width));
+      image(image_paused, width / 2, 123, width / 2, width / 2 * (float(image_paused.height) / image_paused.width));
       textFont(songFont, 48);
       textAlign(CENTER, CENTER);
       text("<Press esc to return to game>", width / 2, height / 1.45);
@@ -1045,7 +1067,7 @@ void draw() {
       fadeBack(1, 255);
       fill(255);
       imageMode(CENTER);
-      image(image_paused, width / 2, 123, width / 2, width / 2 * (float(image_paused.height) / image_paused.width));
+      image(image_settings, width / 2, 123, width / 2, width / 2 * (float(image_settings.height) / image_settings.width));
       
       textFont(defaultFont, 32);
       textAlign(LEFT, CENTER);
@@ -1126,6 +1148,31 @@ void draw() {
     }
   }
 
+  if(DEBUG_TIMINGS.state) {
+    fill(0, 64);
+    noStroke();
+    rectMode(CORNER);
+    float rectWidth           = 400;
+    float textFontSize        = 18;
+    float topPadding          = 75;
+    float rightPadding        = 2;
+    float textPaddingSides    = 5;
+    float textPaddingVertical = 2;
+
+    float adjTextHeight = textFontSize + textPaddingVertical;
+    float rectHeight = timingDisplay.size() * adjTextHeight + textPaddingVertical * 3;
+    rect(width - rectWidth - rightPadding, topPadding, rectWidth, rectHeight);
+    textFont(defaultFont, textFontSize);
+    fill(255);
+    int i = 0;
+    for(Map.Entry<String, String> entry : timingDisplay.entrySet()) {
+      textAlign(LEFT, TOP);
+      text(entry.getKey()  , width - rightPadding + textPaddingSides - rectWidth, textPaddingVertical + topPadding + i * adjTextHeight);
+      textAlign(RIGHT, TOP); 
+      text(entry.getValue(), width - rightPadding - textPaddingSides            , textPaddingVertical + topPadding + i * adjTextHeight);
+      i++;
+    }
+  }
   if(SHOW_FPS.state) { //FPS Tracker
     rectMode(CORNER);
     noStroke();
@@ -1144,6 +1191,8 @@ void draw() {
       cursor(activeCursor);
     }
   }
+
+  if(timerUpdateTime == -1) timerUpdateTime = millis() + TIMER_UPDATE_FREQUENCY;
 }
 
 void keyPressed() {
@@ -1252,7 +1301,7 @@ void mouseClicked() {
 }
 
 void mouseWheel(processing.event.MouseEvent event) {
-  float e = -((com.jogamp.newt.event.MouseEvent)event.getNative()).getRotation()[1]; //JAVA MOMENT
+  float e = ((com.jogamp.newt.event.MouseEvent)event.getNative()).getRotation()[1]; //JAVA MOMENT
   if(e == 0) return;
   if(gameState.equals("game") || (gameState.equals("settings") && volSlider.checkMouse(MOUSE_OVER))) {
     volSlider.val = constrain(volSlider.val + e, volSlider.val_min, volSlider.val_max);
@@ -1260,7 +1309,7 @@ void mouseWheel(processing.event.MouseEvent event) {
   }else if(gameState.equals("gameSelect")) {
     if(millis() > scrollWait) {
       scrollWait = millis() + max(5, map(sq(e), 0, 0.3, 150, 0));
-      moveSongSel(int(abs(e) >= 1 ? e : e / abs(e)));
+      moveSongSel(-int(abs(e) >= 1 ? e : e / abs(e)));
     }
   }
 }
