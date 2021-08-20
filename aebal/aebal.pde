@@ -9,16 +9,14 @@ import java.util.Map;
 import java.io.File;
 
 float FPS = 1000;
-float songComplexity = 0.2; //How "Complex" the current song is, aka make this higher if your song is really loud/bassy
-float targetComplexity = 0.26; //Magic number leave it be
+float songComplexity = 1; //How "Complex" the current song is, aka make this higher if your song is really loud/bassy
 float BACKGROUND_COLOR_FADE = 0.33;
+float TIMER_UPDATE_FREQUENCY = 500;
+boolean DO_ENEMY_SPAWNING   = true;
+boolean ALLOW_DEBUG_ACTIONS = true;
 int gameSelect_songDisplayCount = 5;
 String gameState = "gameSelect";
 
-
-//General vars
-boolean DO_ENEMY_SPAWNING      = true;
-float   TIMER_UPDATE_FREQUENCY = 500;
 
 boolean intense, textSFXPlaying, songEndScreenSkippable, mouseOverSong, paused, show_fade_in = true;
 int score, hitCount, durationInto, song_intensity_count, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1;
@@ -48,7 +46,8 @@ field f;
 arrow a;
 button[] settings, settings_left, settings_right;
 button settings_button, back_button, DEBUG_TIMINGS, DYNAMIC_BACKGROUND_COLOR, DO_POST_PROCESSING, BACKGROUND_BLOBS, BACKGROUND_FADE, DO_HIT_PROMPTS, NO_DAMAGE, RGB_ENEMIES, DO_CHROMA, DO_SHAKE, SHOW_FPS;
-slider volSlider;
+vol_slider volSlider;
+difficulty_slider difficultySlider;
 PVector[] previousPos;
 
 //Math related constants
@@ -534,22 +533,23 @@ void setup() {
   color setting_default_f_active = #FF9999;
 
   settings = new button[] {
-    NO_DAMAGE                = new button(0, 0, 75, 75, 5, "Invincible"          , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
-    RGB_ENEMIES              = new button(0, 0, 75, 75, 5, "RGB Enemies"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
-    DO_CHROMA                = new button(0, 0, 75, 75, 5, "Chromatic Aberration", setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
-    DO_SHAKE                 = new button(0, 0, 75, 75, 5, "Shake"               , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
-    SHOW_FPS                 = new button(0, 0, 75, 75, 5, "FPS Tracker"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     DYNAMIC_BACKGROUND_COLOR = new button(0, 0, 75, 75, 5, "Dynamic Background"  , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
-    DO_POST_PROCESSING       = new button(0, 0, 75, 75, 5, "Shaders"             , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
+    DO_POST_PROCESSING       = new button(0, 0, 75, 75, 5, "Bloom"               , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     BACKGROUND_BLOBS         = new button(0, 0, 75, 75, 5, "Background Blobs"    , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     BACKGROUND_FADE          = new button(0, 0, 75, 75, 5, "Background Fade"     , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     DO_HIT_PROMPTS           = new button(0, 0, 75, 75, 5, "Score Ticks"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
-    DEBUG_TIMINGS            = new button(0, 0, 75, 75, 5, "Timing Info"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active)
+    DEBUG_TIMINGS            = new button(0, 0, 75, 75, 5, "Timing Info"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
+    RGB_ENEMIES              = new button(0, 0, 75, 75, 5, "RGB Enemies"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
+    NO_DAMAGE                = new button(0, 0, 75, 75, 5, "Invincible"          , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
+    DO_CHROMA                = new button(0, 0, 75, 75, 5, "Chromatic Aberration", setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
+    DO_SHAKE                 = new button(0, 0, 75, 75, 5, "Shake"               , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
+    SHOW_FPS                 = new button(0, 0, 75, 75, 5, "FPS Tracker"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active)
   };
-  NO_DAMAGE.state = false;
+  NO_DAMAGE.state     = false;
+  DEBUG_TIMINGS.state = false;
 
-  settings_left  = new button[] {NO_DAMAGE, RGB_ENEMIES, DO_CHROMA, DO_SHAKE, SHOW_FPS};
-  settings_right = new button[] {DYNAMIC_BACKGROUND_COLOR, DO_POST_PROCESSING, BACKGROUND_BLOBS, BACKGROUND_FADE, DO_HIT_PROMPTS};
+  settings_left  = new button[] {RGB_ENEMIES, DO_CHROMA, DO_SHAKE, BACKGROUND_FADE, DO_HIT_PROMPTS};
+  settings_right = new button[] {DYNAMIC_BACKGROUND_COLOR, DO_POST_PROCESSING, BACKGROUND_BLOBS, SHOW_FPS, DEBUG_TIMINGS};
 
   for(int i = 0; i < settings_left.length; i++) {
     settings_left[i].x = 100;
@@ -560,7 +560,8 @@ void setup() {
     settings_right[i].y = height / 1.65 - settings_right.length * 50 + i * 100;
   }
 
-  volSlider = new slider(width / 2, height / 1.175, 600, 35, 0, -30, 20, "Volume", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
+  volSlider        = new vol_slider       (width / 2, height / 1.175, 600, 35, 0             , -30 , 20, "Volume"    , #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
+  difficultySlider = new difficulty_slider(width / 2, height - 120  , 600, 35, songComplexity, 0.75, 2 , "Difficulty", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
 
   image_back256  = loadImage(sketchPath("assets/Images/backarrow_256.png"));
   text_logo      = loadImage(sketchPath("assets/Images/aebal_text.png"   ));
@@ -639,7 +640,7 @@ void draw() {
       gameSelect_songSelect_actual = Math.floorMod(gameSelect_songSelect_actual, songList.size());
       gameSelect_songSelect = lerp(gameSelect_songSelect, gameSelect_songSelect_actual, 0.1);
 
-      float y_offset = 250;
+      float y_offset = 125;
       int min_s = gameSelect_songSelect_actual - gameSelect_songDisplayCount;
       int max_s = min(gameSelect_songSelect_actual + gameSelect_songDisplayCount, songList.size());
       textFont(defaultFont, 50);
@@ -678,6 +679,9 @@ void draw() {
         }
         y_offset += fontSize + 5;
       }
+      textFont(defaultFont, 60);
+      textAlign(CENTER, BOTTOM);
+      difficultySlider.draw();
       settings_button.draw();
       back_button.draw();
       
@@ -687,7 +691,7 @@ void draw() {
       TT("Physics");
       fft.forward(song.sound.mix);
       float tmp_intensity = findComplexity(song.sound.mix.toArray()) * (0.65 + song.sound.mix.level());
-      c = tmp_intensity * (targetComplexity / songComplexity);
+      c = tmp_intensity * songComplexity;
       song_total_intensity += tmp_intensity;
       song_intensity_count++;
       noScoreTimer -= (60 / frameRate);
@@ -814,11 +818,11 @@ void draw() {
 
               n = int(random(3, 6.25));
               int d = 1 + int(c * 5);
-              float sz = random(250, 750 - c * 200);
+              float sz = random(250, 750 - c * 250);
               float objRot = random(0, TWO_PI);
               loc.lerp(vec2(width / 2, height / 2), random(0, 1));
               for(float i = 0; i < TWO_PI; i += TWO_PI / (n * d)) {
-                PVector objLoc = PVector.fromAngle(TWO_PI / n * floor(n * i / TWO_PI)).lerp(PVector.fromAngle(TWO_PI / n * ceil(n * i / TWO_PI)), (i * n / TWO_PI) % 1.0).rotate(objRot).mult(c * sz).add(loc);
+                PVector objLoc = PVector.fromAngle(TWO_PI / n * floor(n * i / TWO_PI)).lerp(PVector.fromAngle(TWO_PI / n * ceil(n * i / TWO_PI)), (i * n / TWO_PI) % 1.0).rotate(objRot).mult(sz).add(loc);
                 PVector objVel = PVector.sub(loc, objLoc).setMag(1).rotate(HALF_PI);
                 objs.add(new obj(
                   PVector.add(objLoc, PVector.mult(objVel, -dis)),
@@ -845,7 +849,7 @@ void draw() {
 
         randTrans = DO_SHAKE.state ? vec2(s_random(10 * -c, 10 * c), s_random(10 * -c, 10 * c)) : vec2();
         ang += (0.001 + constrain(c / 75, 0, 0.05)) * (200 / frameRate);
-        a.speed = constrain(a.speed * (1 + constrain((c - targetComplexity) / 100, -0.05, 0.05)), 0.5, 1.75);
+        a.speed = constrain(a.speed * (1 + constrain((c - 0.25) / 100, -0.05, 0.05)), 0.5, 1.75);
         float dfc = sqrt(sq(width) + sq(height));
         
         a.x = cos(ang) * dfc + width / 2;
@@ -874,7 +878,7 @@ void draw() {
         color updatedColor;
         updatedColor = intense ? color((100 + (c * 500)) % 255, 255, (c - 0.25) * 200) : color((c * 200) % 255);
         backColor = lerpColor(backColor, updatedColor, BACKGROUND_COLOR_FADE);
-        background(hue(backColor), saturation(backColor), brightness(backColor) / 2.0);
+        background(hue(backColor), saturation(backColor), brightness(backColor) / 3.1);
         colorMode(RGB);
       }else{
         background(0);
@@ -952,43 +956,43 @@ void draw() {
         }
         postProcessingBuilder.compose();
         TT("PostFX");
-        if(DO_CHROMA.state) {
-          float prec = 0.75;
-          PVector nextChroma_r, nextChroma_g, nextChroma_b;
-          PVector zeroVector = vec2();
-          if(intense) {
-            if(c >= 1) {
-              float offset = (2 * ((2 * c + 0.5) % 1) - 1) / 5;
-              float offset_y = s_random(-c / 6, c / 6);
-              if(s_random(0, 1) < 0.5) {
-                nextChroma_r = vec2( offset, s_random(-offset_y, offset_y));
-                nextChroma_g = vec2(-offset, s_random(-offset_y, offset_y));
-                nextChroma_b = vec2(s_random(-offset, offset), s_random(-offset_y, offset_y));
-              }else{
-                nextChroma_r = vec2(s_random(-offset_y, offset_y), offset);
-                nextChroma_g = vec2(s_random(-offset_y, offset_y), -offset);
-                nextChroma_b = vec2(s_random(-offset_y, offset_y), s_random(-offset, offset));
-              }
+      }
+      if(DO_CHROMA.state) {
+        TT("ChromaAbbr");
+        float prec = 0.75;
+        PVector nextChroma_r, nextChroma_g, nextChroma_b;
+        PVector zeroVector = vec2();
+        if(intense) {
+          if(c >= songComplexity) {
+            float offset = (2 * ((2 * c + 0.5) % 1) - 1) / 5;
+            float offset_y = s_random(-c / 6, c / 6);
+            if(s_random(0, 1) < 0.5) {
+              nextChroma_r = vec2( offset, s_random(-offset_y, offset_y));
+              nextChroma_g = vec2(-offset, s_random(-offset_y, offset_y));
+              nextChroma_b = vec2(s_random(-offset, offset), s_random(-offset_y, offset_y));
             }else{
-              nextChroma_r = vec2(randTrans.x / 1200.0, 0.0);
-              nextChroma_g = vec2(0, 0);
-              nextChroma_b = vec2(0.0, randTrans.y / 1200.0);
+              nextChroma_r = vec2(s_random(-offset_y, offset_y), offset);
+              nextChroma_g = vec2(s_random(-offset_y, offset_y), -offset);
+              nextChroma_b = vec2(s_random(-offset_y, offset_y), s_random(-offset, offset));
             }
           }else{
-            nextChroma_r = zeroVector;
-            nextChroma_g = zeroVector;
-            nextChroma_b = zeroVector;
+            nextChroma_r = vec2(randTrans.x / 1200.0, 0.0);
+            nextChroma_g = vec2(0, 0);
+            nextChroma_b = vec2(0.0, randTrans.y / 1200.0);
           }
-          chroma_r = chroma_r.mult(prec).add(nextChroma_r.mult(1 - prec));
-          chroma_g = chroma_g.mult(prec).add(nextChroma_g.mult(1 - prec));
-          chroma_b = chroma_b.mult(prec).add(nextChroma_b.mult(1 - prec));
-          chroma.set("r", chroma_r.x, chroma_r.y);
-          chroma.set("g", chroma_g.x, chroma_g.y);
-          chroma.set("b", chroma_b.x, chroma_b.y);
-          TT("ChromaAbbr");
-          filter(chroma);
-          TT("ChromaAbbr");
+        }else{
+          nextChroma_r = zeroVector;
+          nextChroma_g = zeroVector;
+          nextChroma_b = zeroVector;
         }
+        chroma_r = chroma_r.mult(prec).add(nextChroma_r.mult(1 - prec));
+        chroma_g = chroma_g.mult(prec).add(nextChroma_g.mult(1 - prec));
+        chroma_b = chroma_b.mult(prec).add(nextChroma_b.mult(1 - prec));
+        chroma.set("r", chroma_r.x, chroma_r.y);
+        chroma.set("g", chroma_g.x, chroma_g.y);
+        chroma.set("b", chroma_b.x, chroma_b.y);
+        filter(chroma);
+        TT("ChromaAbbr");
       }
 
       if(DO_HIT_PROMPTS.state) {
@@ -1011,8 +1015,7 @@ void draw() {
       fill(255, 200);
       textFont(songFont, 48);
       textAlign(LEFT, BOTTOM);
-      songComplexity = max(songComplexity, 0.08);
-      text(songPath + " | " + round(100 - 100 * songComplexity) + '%', 10, height - 10);
+      text(songPath, 10, height - 10);
       textFont(defaultFont);
 
       if(DO_POST_PROCESSING.state) {
@@ -1125,7 +1128,7 @@ void draw() {
       textAlign(LEFT, CENTER);
       float titleWidth = textWidth(songPath) / 2;
       textFont(songFont, 40);
-      float calculatedScore = float(score) / (1 + sqrt(float(hitCount))) * pow(1.4 * (1.0 - songComplexity), 3);
+      float calculatedScore = float(score) / (1 + sqrt(float(hitCount))) * pow(1.4 * (songComplexity), 3);
       text("Score:\t\t " + adjustedScore + "\nHit Count:\t\t " + adjustedHitCount+"\nGrade:\t\t " + calculatedScore, width / 2 - titleWidth, height / 2.33);
 
       if(durationInto > 500) songEndScreenSkippable = true;
@@ -1217,18 +1220,20 @@ void keyPressed() {
       exit();
     }
   }else if(gameState == "game") {
-    switch(keyCode) {
-      case UP: {
-        songComplexity *= 0.9;
-      } break;
-      case DOWN: {
-        songComplexity *= 1.1;
-      } break;
-      default: {
-        if(key == ' ') {
-          song.sound.skip(30 * 1000);
-        }
-      } break;
+    if(ALLOW_DEBUG_ACTIONS) {
+      switch(keyCode) {
+        case UP: {
+          songComplexity += 0.1;
+        } break;
+        case DOWN: {
+          songComplexity -= 0.1;
+        } break;
+        default: {
+          if(key == ' ') {
+            song.sound.skip(30 * 1000);
+          }
+        } break;
+      }
     }
   }else if(gameState.equals("gameSelect")) {
     if(keyCode == UP) {
@@ -1259,6 +1264,8 @@ void mousePressed() {
       b.checkMouse(MOUSE_PRESS);
     }
     volSlider.checkMouse(MOUSE_PRESS);
+  }else if(gameState.equals("gameSelect")) {
+    difficultySlider.checkMouse(MOUSE_PRESS);
   }
   if(gameState.equals("pause") || gameState.equals("gameSelect") || gameState.equals("settings")) {
     back_button.checkMouse(MOUSE_PRESS);
@@ -1287,6 +1294,7 @@ void mouseReleased() {
     if(back_button.active && back_button.checkMouse(MOUSE_RELEASE)) {
       exit();
     }
+    difficultySlider.checkMouse(MOUSE_RELEASE);
   }else if(gameState.equals("pause")) {
     if(back_button.active && back_button.checkMouse(MOUSE_RELEASE)) {
       gotoLevelSelect();
@@ -1301,13 +1309,16 @@ void mouseClicked() {
 }
 
 void mouseWheel(processing.event.MouseEvent event) {
+  if(!focused) return;
   float e = ((com.jogamp.newt.event.MouseEvent)event.getNative()).getRotation()[1]; //JAVA MOMENT
   if(e == 0) return;
   if(gameState.equals("game") || (gameState.equals("settings") && volSlider.checkMouse(MOUSE_OVER))) {
-    volSlider.val = constrain(volSlider.val + e, volSlider.val_min, volSlider.val_max);
+    volSlider.onScroll(e);
     setGlobalVolume(volSlider.val);
   }else if(gameState.equals("gameSelect")) {
-    if(millis() > scrollWait) {
+    if(difficultySlider.checkMouse(MOUSE_OVER)) {
+      difficultySlider.onScroll(e);
+    }else if(millis() > scrollWait) {
       scrollWait = millis() + max(5, map(sq(e), 0, 0.3, 150, 0));
       moveSongSel(-int(abs(e) >= 1 ? e : e / abs(e)));
     }

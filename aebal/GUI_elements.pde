@@ -97,6 +97,7 @@ class slider {
         this.clr_ball_active = clr_ball_active;
         this.ballHfactor = 1.3;
         active = false;
+        onChange();
     }
     slider(float x, float y, float w, float h, float val, float val_min, float val_max, color clr_line, color clr_ball, color clr_line_hover, color clr_ball_hover, color clr_line_active, color clr_ball_active) {
         init(x, y, w, h, val, val_min, val_max, null, clr_line, clr_ball, clr_line_hover, clr_ball_hover, clr_line_active, clr_ball_active);
@@ -111,7 +112,17 @@ class slider {
         init(x, y, w, h, val, val_min, val_max, txt , clr, clr, clr_hover, clr_hover, clr_hover, clr_active);
     }
     float getMappedVal() {
-        return map(val, val_min, val_max, x - w / 2, x + w / 2);
+        return map(val, val_min, val_max, x - w / 2.05, x + w / 2.05);
+    }
+    float getNormVal() {
+        return norm(val, val_min, val_max);
+    }
+    void onRelease() {}
+    void onChange() {}
+    void onScroll(float e) {
+        float pVal = val;
+        val = clamp(val + e * (val_max - val_min) / 35, val_min, val_max);
+        if(val != pVal) onChange();
     }
     boolean checkMouse(int type) {
         float offsetX = w / 2 - h / 2;
@@ -119,13 +130,16 @@ class slider {
         boolean pre_active = active;
         if(type > 0) active = type == MOUSE_PRESS && over; //this line is sex
         if(pre_active && !active) {
-            setGlobalVolume(volSlider.val);
-            volChangeSFX.playR();
+            onRelease();
         }
         return over;
     }
     void draw() {
-        if(active) val = constrain(map(mouseX, x - w / 2, x + w / 2, val_min, val_max), val_min, val_max);
+        float pVal = val;
+        if(active) {
+            val = constrain(map(mouseX, x - w / 2, x + w / 2, val_min, val_max), min(val_min, val_max), max(val_min, val_max));
+            if(val != pVal) onChange();
+        }
         boolean mouseOver = checkMouse(MOUSE_OVER);
         if(mouseOver) activeCursor = HAND;
         rectMode(CENTER);
@@ -136,5 +150,65 @@ class slider {
         if(txt != null) {
             text(txt, x, y + g.textSize / 1.5 * (g.textAlignY == BOTTOM ? -1 : 1));
         } 
+    }
+}
+
+class vol_slider extends slider {
+    //Because an option to inherent constructors would be just too good wouldn't it
+    vol_slider(float x, float y, float w, float h, float val, float val_min, float val_max, color clr_line, color clr_ball, color clr_line_hover, color clr_ball_hover, color clr_line_active, color clr_ball_active) {
+        super(x, y, w, h, val, val_min, val_max, null, clr_line, clr_ball, clr_line_hover, clr_ball_hover, clr_line_active, clr_ball_active);
+    }
+    vol_slider(float x, float y, float w, float h, float val, float val_min, float val_max, color clr, color clr_hover, color clr_active) {
+        super(x, y, w, h, val, val_min, val_max, null, clr, clr, clr_hover, clr_hover, clr_hover, clr_active);
+    }
+    vol_slider(float x, float y, float w, float h, float val, float val_min, float val_max, String txt, color clr_line, color clr_ball, color clr_line_hover, color clr_ball_hover, color clr_line_active, color clr_ball_active) {
+        super(x, y, w, h, val, val_min, val_max, txt , clr_line, clr_ball, clr_line_hover, clr_ball_hover, clr_line_active, clr_ball_active);
+    }
+    vol_slider(float x, float y, float w, float h, float val, float val_min, float val_max, String txt, color clr, color clr_hover, color clr_active) {
+        super(x, y, w, h, val, val_min, val_max, txt , clr, clr, clr_hover, clr_hover, clr_hover, clr_active);
+    }
+    void onRelease() {
+        setGlobalVolume(volSlider.val);
+        volChangeSFX.playR();
+    }
+}
+
+class difficulty_slider extends slider {
+    difficulty_slider(float x, float y, float w, float h, float val, float val_min, float val_max, color clr_line, color clr_ball, color clr_line_hover, color clr_ball_hover, color clr_line_active, color clr_ball_active) {
+        super(x, y, w, h, val, val_min, val_max, null, clr_line, clr_ball, clr_line_hover, clr_ball_hover, clr_line_active, clr_ball_active);
+    }
+    difficulty_slider(float x, float y, float w, float h, float val, float val_min, float val_max, color clr, color clr_hover, color clr_active) {
+        super(x, y, w, h, val, val_min, val_max, null, clr, clr, clr_hover, clr_hover, clr_hover, clr_active);
+    }
+    difficulty_slider(float x, float y, float w, float h, float val, float val_min, float val_max, String txt, color clr_line, color clr_ball, color clr_line_hover, color clr_ball_hover, color clr_line_active, color clr_ball_active) {
+        super(x, y, w, h, val, val_min, val_max, txt , clr_line, clr_ball, clr_line_hover, clr_ball_hover, clr_line_active, clr_ball_active);
+    }
+    difficulty_slider(float x, float y, float w, float h, float val, float val_min, float val_max, String txt, color clr, color clr_hover, color clr_active) {
+        super(x, y, w, h, val, val_min, val_max, txt , clr, clr, clr_hover, clr_hover, clr_hover, clr_active);
+    }
+    void onChange() {
+        val = float(nf(val, 0, 2));
+        songComplexity = val;
+        float n = getNormVal();
+        color newCol = lerpColors(n, #00FF00, #0000FF, #FF0000);
+        clr_line        = mulColor(newCol, vec3(0.8));
+        clr_line_hover  = mulColor(newCol, vec3(0.9));
+        clr_line_active = newCol;
+        clr_ball        = mulColor(clr_line       , vec3(0.65));
+        clr_ball_hover  = mulColor(clr_line_hover , vec3(0.65));
+        clr_ball_active = mulColor(clr_line_active, vec3(0.65));
+        int displayVal = int(n * 100);
+        if(displayVal < 35) {
+            txt = "Difficulty - Easy ("+displayVal+"%)";
+        }else if(displayVal < 60) {
+            txt = "Difficulty - Medium ("+displayVal+"%)";
+        }else if(displayVal < 90) {
+            txt = "Difficulty - Hard ("+displayVal+"%)";
+        }else{
+            txt = "Difficulty - Impossible ("+displayVal+"%)"; 
+        }
+    }
+    void onRelease() {
+        onChange();
     }
 }

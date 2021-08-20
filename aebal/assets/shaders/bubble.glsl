@@ -19,7 +19,7 @@ vec3 hsv2rgb(vec3 c) {
 float v = 10.0 / pow(0.6, 2.0);
 void main() {
     vec2 st = vertTexCoord.xy;
-    st = 0.45*vec2(st.x * resolution.x / resolution.y - 0.5, st.y - 0.5);
+    st = 0.5*vec2(st.x * resolution.x / resolution.y - 0.5, st.y - 0.5);
     
     vec4 color = vec4(0.0);
     
