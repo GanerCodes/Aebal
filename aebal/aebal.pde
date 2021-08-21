@@ -10,28 +10,26 @@ import java.io.File;
 
 float FPS = 1000;
 float songComplexity = 1; //How "Complex" the current song is, aka make this higher if your song is really loud/bassy
-float BACKGROUND_COLOR_FADE = 0.33;
+float BACKGROUND_COLOR_FADE = 0.275;
 float TIMER_UPDATE_FREQUENCY = 500;
 boolean DO_ENEMY_SPAWNING   = true;
 boolean ALLOW_DEBUG_ACTIONS = true;
 int gameSelect_songDisplayCount = 5;
-String gameState = "gameSelect";
 
-
-boolean intense, textSFXPlaying, songEndScreenSkippable, mouseOverSong, paused, show_fade_in = true;
+boolean intense, keydown_SHIFT, checkTimes, textSFXPlaying, songEndScreenSkippable, mouseOverSong, paused, show_fade_in = true;
 int score, hitCount, durationInto, song_intensity_count, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1;
 float scrollWait, gameSelect_songSelect, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, song_total_intensity, millisDelta, grayScaleTimer = 100;
-String songPath, previousScene;
-boolean keydown_SHIFT, checkTimes;
-PVector pos, randTrans, chroma_r, chroma_g, chroma_b;
+String songPath, previousScene, gameState = "gameSelect";
 StringList songList, songListShorthands;
+PVector pos, randTrans, chroma_r, chroma_g, chroma_b;
+PVector[] previousPos;
 Sound song, hitSound, buttonSFX, textSFX, volChangeSFX, songSelChange, gainScore;
 Sound[] soundList;
 Minim minim;
 FFT fft;
 color backColor, globalObjColor;
 PGraphics back, back2;
-PImage screen, text_logo, image_gear256, image_back256, image_settings, image_paused;
+PImage screen, text_logo, image_gear, image_back, image_settings, image_paused;
 PFont defaultFont, songFont;
 PShader bubbleShader, chroma, reduceOpacity, grayScale;
 DecimalFormat timerFormat;
@@ -48,7 +46,6 @@ button[] settings, settings_left, settings_right;
 button settings_button, back_button, DEBUG_TIMINGS, DYNAMIC_BACKGROUND_COLOR, DO_POST_PROCESSING, BACKGROUND_BLOBS, BACKGROUND_FADE, DO_HIT_PROMPTS, NO_DAMAGE, RGB_ENEMIES, DO_CHROMA, DO_SHAKE, SHOW_FPS;
 vol_slider volSlider;
 difficulty_slider difficultySlider;
-PVector[] previousPos;
 
 //Math related constants
 float FIFTH_PI = 0.62831853071;
@@ -75,16 +72,6 @@ int getOnScreenObjCount() {
     }
   }
   return i;
-}
-
-float[] rectAngleMap(float a, float w, float h) {
-  float cosA = cos(a);
-  float sinA = sin(a);
-  float div = 2 * max(abs(cosA), abs(sinA));
-  return new float[] {
-    (w * cosA) / div, 
-    (h * sinA) / div
-  };
 }
 
 boolean lineIntersection(PVector a, PVector b, PVector c, PVector d) {
@@ -392,8 +379,6 @@ class arrow {
     oT = constrain(oT, 0, 255);
     rot += 0.05 * (60 / frameRate);
     d1 = -mn - (sz) * (cos(rot) + 1);
-    //TODO: make this use something other than an arbitrarily defined circle for hit detection
-    // if(oT > 120 && dist(x + cos(a) * (d1 - 15), y + sin(a) * (d1 - 15), pos.x, pos.y) <= 30) {
     PVector org = vec2(x + cos(a) * d1, y + sin(a) * d1);
     if(oT > 120 && (
       rectIntersection(pos, 20, org, PVector.add(org, PVector.fromAngle(a + FIFTH_PI).mult(30))) || 
@@ -563,11 +548,11 @@ void setup() {
   volSlider        = new vol_slider       (width / 2, height / 1.175, 600, 35, 0             , -30 , 20, "Volume"    , #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
   difficultySlider = new difficulty_slider(width / 2, height - 120  , 600, 35, songComplexity, 0.75, 2 , "Difficulty", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
 
-  image_back256  = loadImage(sketchPath("assets/Images/backarrow_256.png"));
-  text_logo      = loadImage(sketchPath("assets/Images/aebal_text.png"   ));
-  image_gear256  = loadImage(sketchPath("assets/Images/gear_256.png"     ));
-  image_settings = loadImage(sketchPath("assets/Images/settings.png"     ));
-  image_paused   = loadImage(sketchPath("assets/Images/paused.png"       ));
+  image_back     = loadImage(sketchPath("assets/Images/backarrow.png" ));
+  text_logo      = loadImage(sketchPath("assets/Images/aebal_text.png"));
+  image_gear     = loadImage(sketchPath("assets/Images/gear.png"      ));
+  image_settings = loadImage(sketchPath("assets/Images/settings.png"  ));
+  image_paused   = loadImage(sketchPath("assets/Images/paused.png"    ));
 
   songList = new StringList(new File(sketchPath("Songs")).list());
   songListShorthands = new StringList();
@@ -581,8 +566,8 @@ void setup() {
   gameSelect_songSelect_actual = songList.size() / 2;
   gameSelect_songSelect = gameSelect_songSelect_actual;
 
-  settings_button = new button(width - 65, height - 65, 85, 85, 5, image_gear256, color(45), color(75), color(128));
-  back_button = new button(65, height - 65, 85, 85, 5, image_back256, color(45), color(75), color(128));
+  settings_button = new button(width - 65, height - 65, 85, 85, 5, image_gear, color(45), color(75), color(128));
+  back_button = new button(65, height - 65, 85, 85, 5, image_back, color(45), color(75), color(128));
 
   defaultFont = createFont(sketchPath("assets/fonts/defaultFont.ttf"), 128);
   songFont    = createFont(sketchPath("assets/fonts/songFont.ttf"   ), 64 );
@@ -1243,6 +1228,7 @@ void keyPressed() {
     }
   }
 }
+
 void keyReleased() {
   setKeys(false);
   if(gameState.equals("gameSelect")) {
@@ -1258,6 +1244,7 @@ void keyReleased() {
     }
   }
 }
+
 void mousePressed() {
   if(gameState.equals("settings")) {
     for(button b : settings) {
@@ -1272,6 +1259,7 @@ void mousePressed() {
     if(!gameState.equals("settings")) settings_button.checkMouse(MOUSE_PRESS);
   }
 }
+
 void mouseReleased() {
   if(gameState.equals("pause") || gameState.equals("gameSelect")) {
     if(settings_button.active && settings_button.checkMouse(MOUSE_RELEASE)) {
@@ -1301,6 +1289,7 @@ void mouseReleased() {
     }
   }
 }
+
 void mouseClicked() {
   if(mouseOverSong) {
     mouseOverSong = false;
