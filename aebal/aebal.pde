@@ -8,8 +8,8 @@ import java.lang.Math;
 import java.util.Map;
 import java.io.File;
 
-float FPS = 1000;
-float songComplexity = 1; //How "Complex" the current song is, aka make this higher if your song is really loud/bassy
+float FPS = 1000; //Wish I could uncap this
+float songComplexity = 1; //How reactive the song is, aka make this lower if your song is really loud/bassy
 float BACKGROUND_COLOR_FADE = 0.275;
 float TIMER_UPDATE_FREQUENCY = 500;
 boolean DO_ENEMY_SPAWNING   = true;
