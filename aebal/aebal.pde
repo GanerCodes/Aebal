@@ -557,7 +557,7 @@ void setup() {
     if(!menuSettings.isNull("volume")) {
       volSlider.val = menuSettings.getFloat("volume");
     }
-  }catch(Exception e) {
+  }catch(Throwable e) {
     println("Settings file not found or was corrupt: " + e);
     NO_DAMAGE.state     = false;
     DEBUG_TIMINGS.state = false;
