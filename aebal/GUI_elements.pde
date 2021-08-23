@@ -241,13 +241,13 @@ class difficulty_slider extends slider {
         clr_ball_active = mulColor(clr_line_active, vec3(0.65));
         int displayVal = int(n * 100);
         if(displayVal < 35) {
-            txt = "Difficulty - Easy ("+displayVal+"%)";
+            txt = "Difficulty\nEasy ("+displayVal+"%)";
         }else if(displayVal < 60) {
-            txt = "Difficulty - Medium ("+displayVal+"%)";
+            txt = "Difficulty\nMedium ("+displayVal+"%)";
         }else if(displayVal < 90) {
-            txt = "Difficulty - Hard ("+displayVal+"%)";
+            txt = "Difficulty\nHard ("+displayVal+"%)";
         }else{
-            txt = "Difficulty - Impossible ("+displayVal+"%)"; 
+            txt = "Difficulty\nImpossible ("+displayVal+"%)"; 
         }
     }
     void onRelease() {

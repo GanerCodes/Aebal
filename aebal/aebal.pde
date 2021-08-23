@@ -16,7 +16,7 @@ float TIMER_UPDATE_FREQUENCY = 500; //Debug timer update rate (millis)
 boolean DO_ENEMY_SPAWNING     = true;
 boolean ALLOW_DEBUG_ACTIONS   = true; //Space = skip, UP = increase complexity, DOWN = decrease complexity
 boolean REFRESH_SONG_METADATA = true; //Recheck song metadata, even if found in cache
-int gameSelect_songDisplayCount = 5; //How many songs in the Song Selector to display up and down
+int gameSelect_songDisplayCount = 10; //How many songs in the Song Selector to display up and down
 
 boolean intense, keydown_SHIFT, checkTimes, textSFXPlaying, songEndScreenSkippable, mouseOverSong, paused, show_fade_in = true;
 int score, hitCount, durationInto, song_intensity_count, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1, nextVolumeSFXplay = -1;
@@ -555,7 +555,7 @@ void setup() {
   color setting_default_f_active = #FF9999;
 
   volSlider        = new vol_slider       (width / 2, height / 1.175, 600, 35, 0             , -30 , 20, "Volume"    , #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
-  difficultySlider = new difficulty_slider(width / 2, height - 120  , 600, 35, songComplexity, 0.75, 2 , "Difficulty", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
+  difficultySlider = new difficulty_slider(1357, height * 4/5, 500, 35, songComplexity, 0.75, 2 , "Difficulty", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
   settings = new settingButton[] {
     DYNAMIC_BACKGROUND_COLOR = new settingButton(0, 0, 75, 75, 5, "Dynamic Background"  , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     DO_POST_PROCESSING       = new settingButton(0, 0, 75, 75, 5, "Bloom"               , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
@@ -684,11 +684,12 @@ void draw() {
       background(0);
       stroke(128);
       strokeWeight(8);
-      line(width / 2, height * 1/4, width / 2, height * 3/4);
+      strokeCap(ROUND);
+      line(width / 2, height * 1/4, width / 2, height * 8 / 9);
+      strokeCap(PROJECT);
       imageMode(CENTER);
       noStroke();
       image(text_logo, width / 2, text_logo.height / 2);
-      textAlign(CENTER, CENTER);
       gameSelect_songSelect_actual = Math.floorMod(gameSelect_songSelect_actual, songList.size());
       gameSelect_songSelect = lerp(gameSelect_songSelect, gameSelect_songSelect_actual, 0.1);
 
@@ -702,15 +703,17 @@ void draw() {
       float y_offset = 0;
       for(int i = min_s; i < max_s; i++) { //I tryharded this portion, give me money
         float v = 16;
-        float fontSize = max(2, 50 - 10 * pow(abs(i - int(v * gameSelect_songSelect) / v), 0.85));
+        float fontSize = max(2, 50 - 7 * pow(abs(i - int(v * gameSelect_songSelect) / v), 0.9));
         String songTitle = "";
         int newlineCount = 0;
         float offset_y_tmp = 0;
         if(i >= 0) {
           fill(255);
+          textAlign(CENTER, CENTER);
           textSize(fontSize);
           textLeading(fontSize);
-          songTitle = WordUtils.wrap(songList.get(i).title, 32, "\n", true);
+          songElement currentElement = songList.get(i);
+          songTitle = WordUtils.wrap(currentElement.title, 32, "\n", true);
           newlineCount = songTitle.length() - songTitle.replace("\n", "").length();
           offset_y_tmp = newlineCount * fontSize / 2.0;
           y_offset += offset_y_tmp;
@@ -740,6 +743,33 @@ void draw() {
               width / 2 - sw - 15, 250 + y_offset + 6.75,
               width / 2 - sw - 55, 250 + y_offset + 6.75 - 20,
               width / 2 - sw - 55, 250 + y_offset + 6.75 + 20);
+            
+            if(i != songList.size() - 1) {
+              float descSize = 40;
+              textSize(descSize);
+              textLeading(descSize + 5);
+              textAlign(LEFT, TOP);
+              fill(255);
+
+              String songTitleShort = WordUtils.wrap(currentElement.title, 16, "\n", true);
+              int newlineCountShort = songTitleShort.length() - songTitleShort.replace("\n", "").length();
+
+              String newLines = "";
+              for(int tmp = 0; tmp < newlineCountShort; tmp++) {newLines += '\n';}
+              String detailsLeft = "Title:"+newLines;
+              String detailsRight = songTitleShort;
+              if(currentElement.author != null && currentElement.author.length() > 0) {
+                detailsLeft += "\nArtist:";
+                detailsRight += '\n' + currentElement.author;
+              }
+              if(currentElement.duration != null && currentElement.duration.length() > 0) {
+                detailsLeft += "\nDuration:";
+                detailsRight += '\n' + currentElement.duration;
+              }
+
+              text(detailsLeft , width / 2 + descSize / 2 - tx, height * 1/4 + 3 - ty);
+              text(detailsRight, width / 2 + descSize / 2 + 10 * descSize - tx, height * 1/4 + 3 - ty);
+            }
           }
         }
         y_offset += offset_y_tmp + fontSize + 5;
@@ -747,6 +777,7 @@ void draw() {
       popMatrix();
       textFont(defaultFont, 60);
       textAlign(CENTER, BOTTOM);
+      textLeading(64);
       difficultySlider.draw();
       settings_button.draw();
       back_button.draw();
