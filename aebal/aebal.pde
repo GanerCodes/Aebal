@@ -17,10 +17,9 @@ boolean ALLOW_DEBUG_ACTIONS = true;
 int gameSelect_songDisplayCount = 5;
 
 boolean intense, keydown_SHIFT, checkTimes, textSFXPlaying, songEndScreenSkippable, mouseOverSong, paused, show_fade_in = true;
-int score, hitCount, durationInto, song_intensity_count, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1;
+int score, hitCount, durationInto, song_intensity_count, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1, nextVolumeSFXplay = -1;
 float scrollWait, gameSelect_songSelect, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, song_total_intensity, millisDelta, grayScaleTimer = 100;
-String settingsFileLoc, songPath, previousScene, gameState = "gameSelect";
-StringList songList, songListShorthands;
+String settingsFileLoc, songDataFileLoc, previousScene, gameState = "gameSelect";
 PVector pos, randTrans, chroma_r, chroma_g, chroma_b;
 PVector[] previousPos;
 Sound song, hitSound, buttonSFX, textSFX, volChangeSFX, songSelChange, gainScore;
@@ -37,6 +36,7 @@ PostFX postProcessing;
 PostFXBuilder postProcessingBuilder;
 ArrayList<obj> objs = new ArrayList();
 ArrayList<bubble> bubbles = new ArrayList();
+ArrayList<songElement> songList = new ArrayList();
 ArrayList<floatingText> floatingPrompts = new ArrayList();
 HashMap<String, Long> timingList;
 HashMap<String, String> timingDisplay;
@@ -47,7 +47,8 @@ settingButton DEBUG_TIMINGS, DYNAMIC_BACKGROUND_COLOR, DO_POST_PROCESSING, BACKG
 button settings_button, back_button;
 vol_slider volSlider;
 difficulty_slider difficultySlider;
-JSONObject menuSettings;
+JSONObject menuSettings, songCache;
+songElement songP;
 
 //Math related constants
 float FIFTH_PI = 0.62831853071;
@@ -213,25 +214,19 @@ String fileName(String path) {
 }
 
 void loadSong() {
-  song.setSound(minim.loadFile(songPath));
+  song.setSound(minim.loadFile(songP.fileName));
   song.setDefaultVolume(-20);
   song.sound.play();
   fft = new FFT(song.sound.bufferSize(), song.sound.sampleRate());
-  songPath = fileName(songPath);
   setScene("game");
 }
 
-void selectLevel(String songName) {
-  if(songName.equals("///addSong")) {
+void selectLevel(songElement song) {
+  if(song.fileName.equals("///addSong")) {
     selectInput("Select a music file:", "songSelected");
     return;
   }
-  if(songName.indexOf('\\') > -1 || songName.indexOf('/') > -1) {
-    songPath = songName;
-  }else{
-    songPath = sketchPath("songs/" + songName);
-  }
-  String[] tmp = splitTokens(songName, "/\\");
+  songP = song;
   setScene("loading");
   resetEnemies(0);
   resetLevel();
@@ -240,8 +235,8 @@ void selectLevel(String songName) {
   for(int i = 0; i < 4; i++) {
     bubbles.add(new bubble(vec2(s_random(0, width), s_random(0, height))));
   }
-  int randomSeed = trim(tmp[tmp.length - 1]).hashCode();
-  println("Random seed for \"" + songPath + "\": " + randomSeed);
+  int randomSeed = song.title.hashCode();
+  println("Random seed for \"" + song.title + "\": " + randomSeed);
   randomSeed(randomSeed);
   unimportantRandoms.setSeed(randomSeed);
   thread("loadSong");
@@ -249,8 +244,7 @@ void selectLevel(String songName) {
 
 void songSelected(File file) {
   if(file == null) return;
-  songList.insert(songList.size() - 1, file.getAbsolutePath());
-  songListShorthands.insert(songListShorthands.size() - 1, fileName(file.getAbsolutePath()));
+  songList.add(songList.size() - 1, new songElement(songCache, file.getAbsolutePath()));
 }
 
 float adjMillis() {
@@ -290,6 +284,41 @@ class Sound {
   void playR() {
     this.sound.play();
     this.sound.rewind();
+  }
+}
+
+class songElement {
+  String author, duration, title, fileName;
+  JSONObject songCacheDir;
+  songElement(String fileName, String title) {
+    this.fileName = fileName;
+    this.title = title;
+  }
+  songElement(JSONObject songCacheDir, String fileName) {
+    this.songCacheDir = songCacheDir;
+    this.fileName = fileName;
+    this.title = fileName(fileName);
+    if(songCacheDir.isNull(title)) {
+      Sound songTmp = new Sound(minim.loadFile(fileName), song.defaultVolume);
+      AudioMetaData metadata = songTmp.sound.getMetaData();
+      JSONObject songData = new JSONObject();
+      if(metadata.author() != null) {
+        author = metadata.author();
+        songData.setString("author", author);
+      }
+      if(metadata.length() > 0) {
+        duration = durToString(metadata.length());
+        songData.setString("duration", duration);
+      }
+      songCacheDir.setJSONObject(title, songData);
+    }else{
+      JSONObject songMeta = songCacheDir.getJSONObject(title);
+      if(!songMeta.isNull("author")) this.author = songMeta.getString("author");
+      if(!songMeta.isNull("duration")) this.duration = songMeta.getString("duration");
+    }
+  }
+  String durToString(int dur) {
+    return dur / (60 * 1000) + ":" + nf((dur / 1000) % 60, 2);
   }
 }
 
@@ -546,6 +575,7 @@ void setup() {
   }
 
   settingsFileLoc = sketchPath("settings.json");
+  songDataFileLoc = sketchPath("songData.json");
   try {
     assert sketchFile(settingsFileLoc).isFile();
     menuSettings = loadJSONObject(settingsFileLoc);
@@ -575,14 +605,20 @@ void setup() {
   image_settings = loadImage(sketchPath("assets/Images/settings.png"  ));
   image_paused   = loadImage(sketchPath("assets/Images/paused.png"    ));
 
-  songList = new StringList(new File(sketchPath("Songs")).list());
-  songListShorthands = new StringList();
-  for(String s : songList) {
-    songListShorthands.append(fileName(s));
+
+  try {
+    assert new File(sketchPath(songDataFileLoc)).isFile();
+    songCache = loadJSONObject(songDataFileLoc);
+  }catch(Throwable e) {
+    println("Song data file not found or was corrupt: " + e);
+    songCache = new JSONObject();
   }
 
-  songList.append("///addSong");
-  songListShorthands.append("+ Add Song");
+  for(String songName : new File(sketchPath("Songs")).list()) {
+    songList.add(new songElement(songCache, sketchPath("Songs/" + songName)));
+  }
+  saveJSONObject(songCache, songDataFileLoc);
+  songList.add(new songElement("///addSong", "+ Add Song"));
 
   gameSelect_songSelect_actual = songList.size() / 2;
   gameSelect_songSelect = gameSelect_songSelect_actual;
@@ -641,6 +677,7 @@ void draw() {
       activeCursor = ARROW;
       background(0);
       imageMode(CENTER);
+      noStroke();
       image(text_logo, width / 2, text_logo.height / 2);
       textAlign(CENTER, CENTER);
       gameSelect_songSelect_actual = Math.floorMod(gameSelect_songSelect_actual, songList.size());
@@ -656,9 +693,9 @@ void draw() {
         if(i >= 0) {
           fill(255);
           textSize(fontSize);
-          text(songListShorthands.get(i), width / 2, 250 + y_offset);
+          text(songList.get(i).title, width / 2, 250 + y_offset);
           if(i == gameSelect_songSelect_actual) {
-            float txtWid = textWidth(songListShorthands.get(i));
+            float txtWid = textWidth(songList.get(i).title);
             float sw = txtWid / 2;
             if(mouseX > width / 2 - (60 + sw) && mouseX < width / 2 + (60 + sw) && mouseY > 250 + y_offset + 6.75 - 27.5 && mouseY < 250 + y_offset + 6.75 + 27.5) {
               mouseOverSong = true;
@@ -1021,7 +1058,7 @@ void draw() {
       fill(255, 200);
       textFont(songFont, 48);
       textAlign(LEFT, BOTTOM);
-      text(songPath, 10, height - 10);
+      text(songP.title + " \t " + songP.duration, 10, height - 10);
       textFont(defaultFont);
 
       if(DO_POST_PROCESSING.state) {
@@ -1075,6 +1112,7 @@ void draw() {
       textAlign(CENTER, CENTER);
       fadeBack(1, 255);
       fill(255);
+      noStroke();
       imageMode(CENTER);
       image(image_settings, width / 2, 123, width / 2, width / 2 * (float(image_settings.height) / image_settings.width));
       
@@ -1092,6 +1130,10 @@ void draw() {
       volSlider.txt = "Volume - " + int(map(volSlider.val, volSlider.val_min, volSlider.val_max, 0, 100)) + '%';
       volSlider.draw();
       back_button.draw();
+      if(nextVolumeSFXplay > 0 && millis() > nextVolumeSFXplay) {
+        volSlider.onRelease();
+        nextVolumeSFXplay = -1;
+      }
     } break;
     case "loading": {
       background(0);
@@ -1130,9 +1172,9 @@ void draw() {
       textAlign(CENTER, CENTER);
       textFont(songFont, 72);
       fill(255);
-      text(songPath, width / 2, height / 4.5);
+      text(songP.title, width / 2, height / 4.5);
       textAlign(LEFT, CENTER);
-      float titleWidth = textWidth(songPath) / 2;
+      float titleWidth = textWidth(songP.title) / 2;
       textFont(songFont, 40);
       float calculatedScore = float(score) / (1 + sqrt(float(hitCount))) * pow(1.4 * (songComplexity), 3);
       text("Score:\t\t " + adjustedScore + "\nHit Count:\t\t " + adjustedHitCount+"\nGrade:\t\t " + calculatedScore, width / 2 - titleWidth, height / 2.33);
@@ -1333,11 +1375,11 @@ void mouseWheel(processing.event.MouseEvent event) {
   float e = ((com.jogamp.newt.event.MouseEvent)event.getNative()).getRotation()[1]; //JAVA MOMENT
   if(e == 0) return;
   if(gameState.equals("game") || (gameState.equals("settings") && volSlider.checkMouse(MOUSE_OVER))) {
-    volSlider.onScroll(e);
+    volSlider.checkScroll(e);
     volSlider.activate();
   }else if(gameState.equals("gameSelect")) {
     if(difficultySlider.checkMouse(MOUSE_OVER)) {
-      difficultySlider.onScroll(e);
+      difficultySlider.checkScroll(e);
     }else if(millis() > scrollWait) {
       scrollWait = millis() + max(5, map(sq(e), 0, 0.3, 150, 0));
       moveSongSel(-int(abs(e) >= 1 ? e : e / abs(e)));

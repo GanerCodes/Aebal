@@ -153,10 +153,12 @@ class slider {
     }
     void onRelease() {}
     void onChange() {}
-    void onScroll(float e) {
+    void onScroll() {}
+    void checkScroll(float e) {
         float pVal = val;
         val = clamp(val + e * (val_max - val_min) / 35, val_min, val_max);
         if(val != pVal) onChange();
+        onScroll();
     }
     boolean checkMouse(int type) {
         float offsetX = w / 2 - h / 2;
@@ -202,7 +204,11 @@ class vol_slider extends slider {
         super(x, y, w, h, val, val_min, val_max, txt , clr, clr, clr_hover, clr_hover, clr_hover, clr_active);
     }
     void onRelease() {
+        activate();
         volChangeSFX.playR();
+    }
+    void onScroll() {
+        nextVolumeSFXplay = millis() + 100;
     }
     void activate() {
         setGlobalVolume(volSlider.val);
