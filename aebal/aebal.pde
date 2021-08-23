@@ -2,6 +2,7 @@ import com.jogamp.newt.event.MouseEvent;
 import ch.bildspur.postfx.builder.*;
 import ch.bildspur.postfx.pass.*;
 import ch.bildspur.postfx.*;
+import org.apache.commons.text.WordUtils;
 import ddf.minim.analysis.*;
 import ddf.minim.*;
 import java.lang.Math;
@@ -10,11 +11,12 @@ import java.io.File;
 
 float FPS = 1000; //Wish I could uncap this
 float songComplexity = 1; //How reactive the song is, aka make this lower if your song is really loud/bassy
-float BACKGROUND_COLOR_FADE = 0.275;
-float TIMER_UPDATE_FREQUENCY = 500;
-boolean DO_ENEMY_SPAWNING   = true;
-boolean ALLOW_DEBUG_ACTIONS = true;
-int gameSelect_songDisplayCount = 5;
+float BACKGROUND_COLOR_FADE = 0.275; //Lerp value
+float TIMER_UPDATE_FREQUENCY = 500; //Debug timer update rate (millis)
+boolean DO_ENEMY_SPAWNING     = true;
+boolean ALLOW_DEBUG_ACTIONS   = true; //Space = skip, UP = increase complexity, DOWN = decrease complexity
+boolean REFRESH_SONG_METADATA = true; //Recheck song metadata, even if found in cache
+int gameSelect_songDisplayCount = 5; //How many songs in the Song Selector to display up and down
 
 boolean intense, keydown_SHIFT, checkTimes, textSFXPlaying, songEndScreenSkippable, mouseOverSong, paused, show_fade_in = true;
 int score, hitCount, durationInto, song_intensity_count, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1, nextVolumeSFXplay = -1;
@@ -80,6 +82,7 @@ int getOnScreenObjCount() {
 boolean lineIntersection(PVector a, PVector b, PVector c, PVector d) {
   return (b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x)>=0?(d.x-c.x)*(b.y-c.y)-(d.y-c.y)*(b.x-c.x)>=0&&(b.x-a.x)*(d.y-a.y)-(b.y-a.y)*(d.x-a.x)<=0&&(d.x-c.x)*(a.y-c.y)-(d.y-c.y)*(a.x-c.x)<=0:(d.x-c.x)*(b.y-c.y)-(d.y-c.y)*(b.x-c.x)<=0&&(b.x-a.x)*(d.y-a.y)-(b.y-a.y)*(d.x-a.x)>=0&&(d.x-c.x)*(a.y-c.y)-(d.y-c.y)*(a.x-c.x)>=0;
 }
+
 boolean rectIntersection(PVector loc, float s, PVector a, PVector b) {
   return lineIntersection(vec2(loc.x - s / 2, loc.y - s / 2), vec2(loc.x + s / 2, loc.y - s / 2), a, b) || 
   lineIntersection(vec2(loc.x + s / 2, loc.y - s / 2), vec2(loc.x + s / 2, loc.y + s / 2), a, b) || 
@@ -298,7 +301,7 @@ class songElement {
     this.songCacheDir = songCacheDir;
     this.fileName = fileName;
     this.title = fileName(fileName);
-    if(songCacheDir.isNull(title)) {
+    if(songCacheDir.isNull(title) || REFRESH_SONG_METADATA) {
       Sound songTmp = new Sound(minim.loadFile(fileName), song.defaultVolume);
       AudioMetaData metadata = songTmp.sound.getMetaData();
       JSONObject songData = new JSONObject();
@@ -319,6 +322,9 @@ class songElement {
   }
   String durToString(int dur) {
     return dur / (60 * 1000) + ":" + nf((dur / 1000) % 60, 2);
+  }
+  String toString() {
+    return (author != null && author.length() > 0 ? author + ": " : "") + songP.title + " (" + songP.duration + ")";
   }
 }
 
@@ -534,7 +540,7 @@ void setup() {
     songSelChange = new Sound(minim.loadFile(sketchPath("assets/SFX/songSelChange.wav")), -15),
     volChangeSFX  = new Sound(minim.loadFile(sketchPath("assets/SFX/volChange.wav"    )), -12),
     buttonSFX     = new Sound(minim.loadFile(sketchPath("assets/SFX/button.wav"       )), -12),
-    gainScore     = new Sound(minim.loadFile(sketchPath("assets/SFX/gainScore.wav"    )),  20),
+    gainScore     = new Sound(minim.loadFile(sketchPath("assets/SFX/gainScore.wav"    )), -20),
     hitSound      = new Sound(minim.loadFile(sketchPath("assets/SFX/hit.wav"          )), -3 ),
     textSFX       = new Sound(minim.loadFile(sketchPath("assets/SFX/textSFX.wav"      )), -18),
     song          = new Sound(-20)
@@ -676,6 +682,9 @@ void draw() {
     case "gameSelect": {
       activeCursor = ARROW;
       background(0);
+      stroke(128);
+      strokeWeight(8);
+      line(width / 2, height * 1/4, width / 2, height * 3/4);
       imageMode(CENTER);
       noStroke();
       image(text_logo, width / 2, text_logo.height / 2);
@@ -683,21 +692,34 @@ void draw() {
       gameSelect_songSelect_actual = Math.floorMod(gameSelect_songSelect_actual, songList.size());
       gameSelect_songSelect = lerp(gameSelect_songSelect, gameSelect_songSelect_actual, 0.1);
 
-      float y_offset = 125;
       int min_s = gameSelect_songSelect_actual - gameSelect_songDisplayCount;
       int max_s = min(gameSelect_songSelect_actual + gameSelect_songDisplayCount, songList.size());
       textFont(defaultFont, 50);
 
-      for(int i = min_s; i < max_s; i++) {
-        float fontSize = max(2, 50 - 10 * pow(abs(i - int(12 * gameSelect_songSelect) / 12.0), 0.85));
+      pushMatrix();
+      float tx = -525, ty = 150;
+      translate(tx, ty);
+      float y_offset = 0;
+      for(int i = min_s; i < max_s; i++) { //I tryharded this portion, give me money
+        float v = 16;
+        float fontSize = max(2, 50 - 10 * pow(abs(i - int(v * gameSelect_songSelect) / v), 0.85));
+        String songTitle = "";
+        int newlineCount = 0;
+        float offset_y_tmp = 0;
         if(i >= 0) {
           fill(255);
           textSize(fontSize);
-          text(songList.get(i).title, width / 2, 250 + y_offset);
+          textLeading(fontSize);
+          songTitle = WordUtils.wrap(songList.get(i).title, 32, "\n", true);
+          newlineCount = songTitle.length() - songTitle.replace("\n", "").length();
+          offset_y_tmp = newlineCount * fontSize / 2.0;
+          y_offset += offset_y_tmp;
+          text(songTitle, width / 2, 250 + y_offset);
           if(i == gameSelect_songSelect_actual) {
-            float txtWid = textWidth(songList.get(i).title);
+            float txtWid = textWidth(songTitle);
             float sw = txtWid / 2;
-            if(mouseX > width / 2 - (60 + sw) && mouseX < width / 2 + (60 + sw) && mouseY > 250 + y_offset + 6.75 - 27.5 && mouseY < 250 + y_offset + 6.75 + 27.5) {
+            float border_expand_y = 27.5 * (newlineCount + 1);
+            if(mouseX - tx > width / 2 - (60 + sw) && mouseX - tx < width / 2 + (60 + sw) && mouseY - ty > 250 + y_offset + 6.75 - border_expand_y && mouseY - ty < 250 + y_offset + 6.75 + border_expand_y) {
               mouseOverSong = true;
               if(mousePressed) {
                 fill(255, 128, 128);
@@ -720,8 +742,9 @@ void draw() {
               width / 2 - sw - 55, 250 + y_offset + 6.75 + 20);
           }
         }
-        y_offset += fontSize + 5;
+        y_offset += offset_y_tmp + fontSize + 5;
       }
+      popMatrix();
       textFont(defaultFont, 60);
       textAlign(CENTER, BOTTOM);
       difficultySlider.draw();
@@ -1058,7 +1081,7 @@ void draw() {
       fill(255, 200);
       textFont(songFont, 48);
       textAlign(LEFT, BOTTOM);
-      text(songP.title + " \t " + songP.duration, 10, height - 10);
+      text(songP.toString(), 10, height - 10);
       textFont(defaultFont);
 
       if(DO_POST_PROCESSING.state) {
