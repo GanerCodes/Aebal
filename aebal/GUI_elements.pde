@@ -52,10 +52,13 @@ class button {
     button(float x, float y, float w, float h, float r, String txt                , color norm_0, color over_0, color down_0, color norm_1, color over_1, color down_1) {
         init(x, y, w, h, r, null   , txt , norm_0, over_0, down_0, norm_1, over_1, down_1);
     }
-
+    void stateChanged() {}
     boolean checkMouse(int type) {
         boolean over = mouseX > x - w/2 && mouseX < x + w/2 && mouseY > y - h/2 && mouseY < y + h/2;
-        if(over && active && type == MOUSE_RELEASE && over_1 != -1) state = !state;
+        if(over && active && type == MOUSE_RELEASE && over_1 != -1) {
+            state = !state;
+            stateChanged();
+        }
         if(type > 0) {
             active = type == MOUSE_PRESS && over;
             if(over && type == MOUSE_RELEASE) buttonSFX.playR();
@@ -72,6 +75,37 @@ class button {
         rect(x, y, w, h, r);
         if(overlay != null) image(overlay, x, y);
         if(txt != null) text(txt, x + (w / 2.0 + g.textSize / 2.5) * (g.textAlign == LEFT ? 1 : -1), y - 4.5); //THIS STUPID LINE TOOK HOURS TO FIGURE OUT, NOWHERE ANYWHERE DOES IT MENTION 'g' AS A VARIABLE TO ACCESS THE PAPPLET's PGRAPHICS, I SCROLLED THROUGH SO MANY DOCS TO FIND THIS
+    }
+}
+
+class settingButton extends button {
+    settingButton(float x, float y, float w, float h, float r, PImage overlay, color norm_0, color over_0, color down_0) {
+        super(x, y, w, h, r, overlay, null, norm_0, over_0, down_0, -1, -1, -1);
+    }
+    settingButton(float x, float y, float w, float h, float r                , color norm_0, color over_0, color down_0) {
+        super(x, y, w, h, r, null   , null, norm_0, over_0, down_0, -1, -1, -1);
+    }
+    settingButton(float x, float y, float w, float h, float r, PImage overlay, color norm_0, color over_0, color down_0, color norm_1, color over_1, color down_1) {
+        super(x, y, w, h, r, overlay, null, norm_0, over_0, down_0, norm_1, over_1, down_1);
+    }
+    settingButton(float x, float y, float w, float h, float r                , color norm_0, color over_0, color down_0, color norm_1, color over_1, color down_1) {
+        super(x, y, w, h, r, null   , null, norm_0, over_0, down_0, norm_1, over_1, down_1);
+    }
+    settingButton(float x, float y, float w, float h, float r, PImage overlay, String txt, color norm_0, color over_0, color down_0) {
+        super(x, y, w, h, r, overlay, txt , norm_0, over_0, down_0, -1, -1, -1);
+    }
+    settingButton(float x, float y, float w, float h, float r, String txt                , color norm_0, color over_0, color down_0) {
+        super(x, y, w, h, r, null   , txt , norm_0, over_0, down_0, -1, -1, -1);
+    }
+    settingButton(float x, float y, float w, float h, float r, PImage overlay, String txt, color norm_0, color over_0, color down_0, color norm_1, color over_1, color down_1) {
+        super(x, y, w, h, r, overlay, txt , norm_0, over_0, down_0, norm_1, over_1, down_1);
+    }
+    settingButton(float x, float y, float w, float h, float r, String txt                , color norm_0, color over_0, color down_0, color norm_1, color over_1, color down_1) {
+        super(x, y, w, h, r, null   , txt , norm_0, over_0, down_0, norm_1, over_1, down_1);
+    }
+    void stateChanged() {
+        menuSettings.setBoolean(txt, state);
+        saveJSONObject(menuSettings, settingsFileLoc);
     }
 }
 
@@ -168,8 +202,10 @@ class vol_slider extends slider {
         super(x, y, w, h, val, val_min, val_max, txt , clr, clr, clr_hover, clr_hover, clr_hover, clr_active);
     }
     void onRelease() {
-        setGlobalVolume(volSlider.val);
         volChangeSFX.playR();
+    }
+    void activate() {
+        setGlobalVolume(volSlider.val);
     }
 }
 

@@ -19,7 +19,7 @@ int gameSelect_songDisplayCount = 5;
 boolean intense, keydown_SHIFT, checkTimes, textSFXPlaying, songEndScreenSkippable, mouseOverSong, paused, show_fade_in = true;
 int score, hitCount, durationInto, song_intensity_count, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1;
 float scrollWait, gameSelect_songSelect, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, song_total_intensity, millisDelta, grayScaleTimer = 100;
-String songPath, previousScene, gameState = "gameSelect";
+String settingsFileLoc, songPath, previousScene, gameState = "gameSelect";
 StringList songList, songListShorthands;
 PVector pos, randTrans, chroma_r, chroma_g, chroma_b;
 PVector[] previousPos;
@@ -42,10 +42,12 @@ HashMap<String, Long> timingList;
 HashMap<String, String> timingDisplay;
 field f;
 arrow a;
-button[] settings, settings_left, settings_right;
-button settings_button, back_button, DEBUG_TIMINGS, DYNAMIC_BACKGROUND_COLOR, DO_POST_PROCESSING, BACKGROUND_BLOBS, BACKGROUND_FADE, DO_HIT_PROMPTS, NO_DAMAGE, RGB_ENEMIES, DO_CHROMA, DO_SHAKE, SHOW_FPS;
+settingButton[] settings, settings_left, settings_right;
+settingButton DEBUG_TIMINGS, DYNAMIC_BACKGROUND_COLOR, DO_POST_PROCESSING, BACKGROUND_BLOBS, BACKGROUND_FADE, DO_HIT_PROMPTS, NO_DAMAGE, RGB_ENEMIES, DO_CHROMA, DO_SHAKE, SHOW_FPS;
+button settings_button, back_button;
 vol_slider volSlider;
 difficulty_slider difficultySlider;
+JSONObject menuSettings;
 
 //Math related constants
 float FIFTH_PI = 0.62831853071;
@@ -517,25 +519,23 @@ void setup() {
   color setting_default_f_over = #FF0000;
   color setting_default_f_active = #FF9999;
 
-  settings = new button[] {
-    DYNAMIC_BACKGROUND_COLOR = new button(0, 0, 75, 75, 5, "Dynamic Background"  , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
-    DO_POST_PROCESSING       = new button(0, 0, 75, 75, 5, "Bloom"               , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
-    BACKGROUND_BLOBS         = new button(0, 0, 75, 75, 5, "Background Blobs"    , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
-    BACKGROUND_FADE          = new button(0, 0, 75, 75, 5, "Background Fade"     , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
-    DO_HIT_PROMPTS           = new button(0, 0, 75, 75, 5, "Score Ticks"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
-    DEBUG_TIMINGS            = new button(0, 0, 75, 75, 5, "Timing Info"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
-    RGB_ENEMIES              = new button(0, 0, 75, 75, 5, "RGB Enemies"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
-    NO_DAMAGE                = new button(0, 0, 75, 75, 5, "Invincible"          , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
-    DO_CHROMA                = new button(0, 0, 75, 75, 5, "Chromatic Aberration", setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
-    DO_SHAKE                 = new button(0, 0, 75, 75, 5, "Shake"               , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
-    SHOW_FPS                 = new button(0, 0, 75, 75, 5, "FPS Tracker"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active)
+  volSlider        = new vol_slider       (width / 2, height / 1.175, 600, 35, 0             , -30 , 20, "Volume"    , #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
+  difficultySlider = new difficulty_slider(width / 2, height - 120  , 600, 35, songComplexity, 0.75, 2 , "Difficulty", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
+  settings = new settingButton[] {
+    DYNAMIC_BACKGROUND_COLOR = new settingButton(0, 0, 75, 75, 5, "Dynamic Background"  , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
+    DO_POST_PROCESSING       = new settingButton(0, 0, 75, 75, 5, "Bloom"               , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
+    BACKGROUND_BLOBS         = new settingButton(0, 0, 75, 75, 5, "Background Blobs"    , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
+    BACKGROUND_FADE          = new settingButton(0, 0, 75, 75, 5, "Background Fade"     , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
+    DO_HIT_PROMPTS           = new settingButton(0, 0, 75, 75, 5, "Score Ticks"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
+    DEBUG_TIMINGS            = new settingButton(0, 0, 75, 75, 5, "Timing Info"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
+    RGB_ENEMIES              = new settingButton(0, 0, 75, 75, 5, "RGB Enemies"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
+    NO_DAMAGE                = new settingButton(0, 0, 75, 75, 5, "Invincible"          , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
+    DO_CHROMA                = new settingButton(0, 0, 75, 75, 5, "Chromatic Aberration", setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
+    DO_SHAKE                 = new settingButton(0, 0, 75, 75, 5, "Shake"               , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
+    SHOW_FPS                 = new settingButton(0, 0, 75, 75, 5, "FPS Tracker"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active)
   };
-  NO_DAMAGE.state     = false;
-  DEBUG_TIMINGS.state = false;
-
-  settings_left  = new button[] {RGB_ENEMIES, DO_CHROMA, DO_SHAKE, BACKGROUND_FADE, DO_HIT_PROMPTS};
-  settings_right = new button[] {DYNAMIC_BACKGROUND_COLOR, DO_POST_PROCESSING, BACKGROUND_BLOBS, SHOW_FPS, DEBUG_TIMINGS};
-
+  settings_left  = new settingButton[] {RGB_ENEMIES, DO_CHROMA, DO_SHAKE, BACKGROUND_FADE, DO_HIT_PROMPTS};
+  settings_right = new settingButton[] {DYNAMIC_BACKGROUND_COLOR, DO_POST_PROCESSING, BACKGROUND_BLOBS, SHOW_FPS, DEBUG_TIMINGS};
   for(int i = 0; i < settings_left.length; i++) {
     settings_left[i].x = 100;
     settings_left[i].y = height / 1.65 - settings_left.length   * 50 + i * 100;
@@ -545,8 +545,29 @@ void setup() {
     settings_right[i].y = height / 1.65 - settings_right.length * 50 + i * 100;
   }
 
-  volSlider        = new vol_slider       (width / 2, height / 1.175, 600, 35, 0             , -30 , 20, "Volume"    , #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
-  difficultySlider = new difficulty_slider(width / 2, height - 120  , 600, 35, songComplexity, 0.75, 2 , "Difficulty", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
+  settingsFileLoc = sketchPath("settings.json");
+  try {
+    assert sketchFile(settingsFileLoc).isFile();
+    menuSettings = loadJSONObject(settingsFileLoc);
+    for(settingButton b : settings) {
+      if(!menuSettings.isNull(b.txt)) {
+        b.state = menuSettings.getBoolean(b.txt);
+      }
+    }
+    if(!menuSettings.isNull("volume")) {
+      volSlider.val = menuSettings.getFloat("volume");
+    }
+  }catch(Exception e) {
+    println("Settings file not found or was corrupt: " + e);
+    NO_DAMAGE.state     = false;
+    DEBUG_TIMINGS.state = false;
+    menuSettings = new JSONObject();
+    for(settingButton b : settings) {
+      menuSettings.setBoolean(b.txt, b.state);
+    }
+    saveJSONObject(menuSettings, settingsFileLoc);
+  }
+
 
   image_back     = loadImage(sketchPath("assets/Images/backarrow.png" ));
   text_logo      = loadImage(sketchPath("assets/Images/aebal_text.png"));
@@ -567,7 +588,7 @@ void setup() {
   gameSelect_songSelect = gameSelect_songSelect_actual;
 
   settings_button = new button(width - 65, height - 65, 85, 85, 5, image_gear, color(45), color(75), color(128));
-  back_button = new button(65, height - 65, 85, 85, 5, image_back, color(45), color(75), color(128));
+  back_button     = new button(65, height - 65, 85, 85, 5, image_back, color(45), color(75), color(128));
 
   defaultFont = createFont(sketchPath("assets/fonts/defaultFont.ttf"), 128);
   songFont    = createFont(sketchPath("assets/fonts/songFont.ttf"   ), 64 );
@@ -1059,11 +1080,11 @@ void draw() {
       
       textFont(defaultFont, 32);
       textAlign(LEFT, CENTER);
-      for(button b : settings_left) {
+      for(settingButton b : settings_left) {
         b.draw();
       }
       textAlign(RIGHT, CENTER);
-      for(button b : settings_right) {
+      for(settingButton b : settings_right) {
         b.draw();
       }
       textSize(60);
@@ -1183,7 +1204,17 @@ void draw() {
   if(timerUpdateTime == -1) timerUpdateTime = millis() + TIMER_UPDATE_FREQUENCY;
 }
 
-void keyPressed() {
+void exit() {
+  println("Exiting, saving settings.");
+  menuSettings.setFloat("volume", volSlider.val);
+  saveJSONObject(menuSettings, settingsFileLoc);
+  super.exit();
+}
+
+void keyPressed(KeyEvent e) {
+  if(keyCode == 100 && e.isAltDown()) {
+    exit();
+  }
   setKeys(true);
   if(key == ESC) {
     key = 0;
@@ -1200,7 +1231,7 @@ void keyPressed() {
     }else if(gameState.equals("settings")) {
       screenshot();
       returnScene();
-      setGlobalVolume(volSlider.val);
+      volSlider.activate();
     }else if(gameState.equals("gameSelect")) {
       exit();
     }
@@ -1247,7 +1278,7 @@ void keyReleased() {
 
 void mousePressed() {
   if(gameState.equals("settings")) {
-    for(button b : settings) {
+    for(settingButton b : settings) {
       b.checkMouse(MOUSE_PRESS);
     }
     volSlider.checkMouse(MOUSE_PRESS);
@@ -1269,14 +1300,14 @@ void mouseReleased() {
     }
   }
   if(gameState.equals("settings")) {
-    for(button b : settings) {
+    for(settingButton b : settings) {
       b.checkMouse(MOUSE_RELEASE);
     }
     volSlider.checkMouse(MOUSE_RELEASE);
     if(back_button.active && back_button.checkMouse(MOUSE_RELEASE)) {
       screenshot();
       returnScene();
-      setGlobalVolume(volSlider.val);
+      volSlider.activate();
     }
   }else if(gameState.equals("gameSelect")) {
     if(back_button.active && back_button.checkMouse(MOUSE_RELEASE)) {
@@ -1303,7 +1334,7 @@ void mouseWheel(processing.event.MouseEvent event) {
   if(e == 0) return;
   if(gameState.equals("game") || (gameState.equals("settings") && volSlider.checkMouse(MOUSE_OVER))) {
     volSlider.onScroll(e);
-    setGlobalVolume(volSlider.val);
+    volSlider.activate();
   }else if(gameState.equals("gameSelect")) {
     if(difficultySlider.checkMouse(MOUSE_OVER)) {
       difficultySlider.onScroll(e);
