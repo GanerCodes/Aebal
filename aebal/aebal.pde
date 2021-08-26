@@ -9,6 +9,13 @@ import java.lang.Math;
 import java.util.Map;
 import java.io.File;
 
+import java.io.IOException;
+import java.nio.file.CopyOption;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+
 float FPS = 1000; //Wish I could uncap this
 float songComplexity = 1; //How reactive the song is, aka make this lower if your song is really loud/bassy
 float BACKGROUND_COLOR_FADE = 0.275; //Lerp value
@@ -18,10 +25,11 @@ boolean ALLOW_DEBUG_ACTIONS   = true; //Space = skip, UP = increase complexity, 
 boolean REFRESH_SONG_METADATA = true; //Recheck song metadata, even if found in cache
 int gameSelect_songDisplayCount = 10; //How many songs in the Song Selector to display up and down
 
-boolean intense, keydown_SHIFT, checkTimes, textSFXPlaying, songEndScreenSkippable, mouseOverSong, paused, show_fade_in = true;
-int score, hitCount, durationInto, song_intensity_count, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1, nextVolumeSFXplay = -1;
-float scrollWait, gameSelect_songSelect, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, song_total_intensity, millisDelta, grayScaleTimer = 100;
+boolean intense, cancerMode, keydown_SHIFT, checkTimes, textSFXPlaying, songEndScreenSkippable, mouseOverSong, paused, show_fade_in = true;
+int cancerCount, score, hitCount, gameFrameCount, durationInto, song_intensity_count, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1, nextVolumeSFXplay = -1;
+float gameFrameRateTotal, scrollWait, fps_tracker, gameSelect_songSelect, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, song_total_intensity, millisDelta, grayScaleTimer = 100;
 String settingsFileLoc, songDataFileLoc, previousScene, gameState = "gameSelect";
+int[] cancerKeys = {UP, UP, DOWN, DOWN, LEFT, RIGHT, LEFT, RIGHT, 66, 65, ENTER};
 PVector pos, randTrans, chroma_r, chroma_g, chroma_b;
 PVector[] previousPos;
 Sound song, hitSound, buttonSFX, textSFX, volChangeSFX, songSelChange, gainScore;
@@ -119,6 +127,8 @@ void setScene(String scene) {
   previousScene = gameState;
   gameState = scene;
   sceneOffsetMillis = adjMillis();
+  gameFrameCount = 0;
+  gameFrameRateTotal = 0;
 }
 
 void returnScene() {
@@ -248,6 +258,11 @@ void selectLevel(songElement song) {
 void songSelected(File file) {
   if(file == null) return;
   songList.add(songList.size() - 1, new songElement(songCache, file.getAbsolutePath()));
+  try {
+    Files.copy(Paths.get(file.getAbsolutePath()), Paths.get(sketchPath("songs/"+file.getName())));
+  }catch(IOException e) {
+    e.printStackTrace();
+  }
 }
 
 float adjMillis() {
@@ -379,15 +394,36 @@ class bubble {
     if(loc.y > height + adjSize) { loc.y = -adjSize; } else if(loc.y < -adjSize) { loc.y = height + adjSize; }
   }
   void draw(PGraphics base) {
-    effect.beginDraw();
-    effect.clear();
     bubbleShader.set("clr", 1.2 * (pow(c, 0.33)));
     bubbleShader.set("mul", c / 5.0);
     bubbleShader.set("opacity", 0.001 + pow(c, 0.75) / 30.0);
     bubbleShader.set("u_time", adjMillis() / 1000.0 + timer_offset);
-    effect.endDraw();
     effect.filter(bubbleShader);
     base.image(effect, loc.x, loc.y);
+
+    // -----------------------------------------------------
+    // Sparkyjohn's failed contribution. Still here for reference if desired.
+    // Texure filterTexture = new Texture(effect, effect.texture.width, effect.texture.height, effect.texture.getParameters());
+    // filterTexture.invertedY(true);
+    // PImage filterImage = new PImage();
+    // filterImage.parent = parent;
+    // filterImage.width = filterImage.pixelWidth = effect.texture.width;
+    // filterImage.height = filterImage.pixelHeight = effect.texture.height;
+    // filterImage.format = ARGB;
+    // effect.setCache(filterImage, effect.texture);
+
+    // effect.beginDraw();
+    // effect.beginShape(QUADS);
+    // effect.texture(filterImage);
+    // effect.fill(255, 0, 0);
+    // effect.vertex(0, 0, 0, 0);
+    // effect.vertex(effect.width, 0, 1, 0);
+    // effect.vertex(effect.width, effect.height, 1, 1);
+    // effect.vertex(0, effect.height, 0, 1);
+    // effect.endShape();
+    // effect.endDraw();
+    // End sparkyjohn's contrib.
+    // -----------------------------------------------------
   }
 }
 
@@ -419,17 +455,23 @@ class arrow {
     PVector org = vec2(x + cos(a) * d1, y + sin(a) * d1);
     if(oT > 120 && (
       rectIntersection(pos, 20, org, PVector.add(org, PVector.fromAngle(a + FIFTH_PI).mult(30))) || 
-      rectIntersection(pos, 20, org, PVector.add(org, PVector.fromAngle(a - FIFTH_PI).mult(30)))
+      rectIntersection(pos, 20, org, PVector.add(org, PVector.fromAngle(a - FIFTH_PI).mult(30))) ||
+      (cancerMode && (
+        rectIntersection(pos, 22.5, org, vec2(x + cos(a) * d2, y + sin(a) * d2)) ||
+        lineIntersection(org, vec2(x + cos(a) * d2, y + sin(a) * d2), previousPos[previousPos.length - 1], pos)
+      ))
     )) {
       if(noScoreTimer <= 0) {
-        gotHit(getOnScreenObjCount() * 2 + 3, 60, true, 2);
+        int scorePer = cancerMode ? 4 : 2;
+        gotHit(getOnScreenObjCount() * scorePer + 3, 60, true, scorePer);
         if(!NO_DAMAGE.state) floatingPrompts.add(new floatingText(x + cos(a) * d1, y + sin(a) * d1, 2250, "-3"));
       }
     }
   }
   void drawLine() {
-    strokeWeight(2);
-    stroke(255, oT);
+    strokeWeight(cancerMode ? 5 : 2);
+    colorMode(RGB);
+    stroke(cancerMode ? color(255, 0, 0, oT) : color(255, oT));
     line(x + cos(a) * d1, y + sin(a) * d1, x + cos(a) * d2, y + sin(a) * d2);
   }
   void drawHead(PGraphics base, int sub) {
@@ -815,6 +857,7 @@ void draw() {
           float n = int(random(3, 3 + c * 4));
         
           float rng = random(c / 10, max(1, c * 2));
+          if(cancerMode) rng = min(1, rng * 2.5);
           int SPAWN_PATTERN = 0;
           if(random(0, 1) < min(0.15, (c - 0.25))) {
             objSpawnTimer = max(objSpawnTimer, 0) + c * 15;
@@ -877,15 +920,17 @@ void draw() {
                 );
               }
             } break;
-            case 3: { //Square
+            case 3: { //Square & Circle
 
               float sz = 50 + c * 80;
               float screenAngle = random(0, TWO_PI);
               float objRot = random(0, TWO_PI) + HALF_PI;
-              float density = max(0.2, 0.5 - c / 3);
+              boolean mode = random(0, 1) > 0.5;
+              float density = max(0.2, 0.5 - c / 3) / (mode ? 1.4 : 1);
               speed /= 2;
               for(float x = -1; x < 1; x += density) {
                 for(float y = -1; y < 1; y += density) {
+                  if(mode && sq(x) + sq(y) > 1) continue;
                   objs.add(new obj(
                     loc.x + dis*cos(screenAngle) + sz*(x*cos(objRot) - y*sin(objRot)),
                     loc.y + dis*sin(screenAngle) + sz*(x*sin(objRot) + y*cos(objRot)),
@@ -1282,11 +1327,15 @@ void draw() {
     rectMode(CORNER);
     noStroke();
     fill(25, 128);
-    rect(width - 82, 2, 80, 20, 3);
+    rect(width - 72, 2, 70, 35, 3);
     fill(255);
-    textAlign(LEFT, CENTER);
+    textAlign(LEFT, BOTTOM);
     textSize(15);
-    text("FPS: " + nf(round(frameRate), 4), width - 80, 10);
+    textLeading(15);
+    gameFrameCount++;
+    gameFrameRateTotal += frameRate;
+    text("FPS: " + nf(min(999, round(fps_tracker)), 3) + "\nAdv: " + nf(min(999, round(gameFrameRateTotal / gameFrameCount)), 3), width - 70, 35);
+    fps_tracker = lerp(fps_tracker, frameRate, 1 / frameRate);
   }
 
   if(activeCursor != previousCursor) {
@@ -1312,6 +1361,18 @@ void keyPressed(KeyEvent e) {
     exit();
   }
   setKeys(true);
+
+  if(keyCode == cancerKeys[cancerCount]) {
+    cancerCount++;
+    if(cancerCount == cancerKeys.length) {
+      cancerMode = !cancerMode;
+      println(cancerMode);
+      cancerCount = 0;
+    }
+  }else{
+    cancerCount = 0;
+  }
+
   if(key == ESC) {
     key = 0;
     if(gameState.equals("levelSummary") || ((gameState.equals("game") || gameState.equals("pause") || gameState.equals("settings")) && keydown_SHIFT)) {

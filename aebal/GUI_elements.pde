@@ -232,7 +232,7 @@ class difficulty_slider extends slider {
         val = float(nf(val, 0, 2));
         songComplexity = val;
         float n = getNormVal();
-        color newCol = lerpColors(n, #00FF00, #0000FF, #FF0000);
+        color newCol = lerpColors(n, #00FF00, #2222FF, #FF0000);
         clr_line        = mulColor(newCol, vec3(0.8));
         clr_line_hover  = mulColor(newCol, vec3(0.9));
         clr_line_active = newCol;
