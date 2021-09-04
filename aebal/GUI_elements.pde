@@ -72,8 +72,14 @@ class button {
         if(mouseOver) activeCursor = HAND; 
         
         fill(state ? (active ? down_0 : (mouseOver ? over_0 : norm_0)) : (active ? down_1 : (mouseOver ? over_1 : norm_1))); //lol
-        rect(x, y, w, h, r);
+        drawBackground();
         if(overlay != null) image(overlay, x, y);
+        drawLabel();
+    }
+    void drawBackground() {
+        rect(x, y, w, h, r);
+    }
+    void drawLabel() {
         if(txt != null) text(txt, x + (w / 2.0 + g.textSize / 2.5) * (g.textAlign == LEFT ? 1 : -1), y - 4.5); //THIS STUPID LINE TOOK HOURS TO FIGURE OUT, NOWHERE ANYWHERE DOES IT MENTION 'g' AS A VARIABLE TO ACCESS THE PAPPLET's PGRAPHICS, I SCROLLED THROUGH SO MANY DOCS TO FIND THIS
     }
 }
@@ -252,5 +258,90 @@ class difficulty_slider extends slider {
     }
     void onRelease() {
         onChange();
+    }
+}
+
+class buttonMenu {
+    ArrayList<dropdownButton> buttons;
+    float x, y, itemWidth, itemHeight;
+    int selectedIndex;
+    color norm_0, over_0, down_0, norm_1, over_1, down_1;
+    buttonMenu(float x, float y, float itemWidth, float itemHeight, color norm_0, color over_0, color down_0, color norm_1, color over_1, color down_1) {
+        buttons = new ArrayList<dropdownButton>();
+        this.x = x;
+        this.y = y;
+        this.itemWidth = itemWidth;
+        this.itemHeight = itemHeight;
+        this.norm_0 = norm_0;
+        this.over_0 = over_0;
+        this.down_0 = down_0;
+        this.norm_1 = norm_1;
+        this.over_1 = over_1;
+        this.down_1 = down_1;
+    }
+    void addButton(String label) {
+        buttons.add(new dropdownButton(x, y + buttons.size() * itemHeight, itemWidth, itemHeight, 1, label, norm_0, over_0, down_0, norm_1, over_1, down_1, this));
+    }
+    void draw() {
+        int i = 0;
+        for(dropdownButton b : buttons) {
+            if(i == 0) {
+                b.r1 = 10;
+                b.r2 = 10;
+                b.r3 = 0;
+                b.r4 = 0;
+            }else if(i == buttons.size() - 1) {
+                b.r1 = 0;
+                b.r2 = 0;
+                b.r3 = 10;
+                b.r4 = 10;
+            }else{
+                b.r1 = 0;
+                b.r2 = 0;
+                b.r3 = 0;
+                b.r4 = 0;
+            }
+            b.draw();
+            i++;
+        }
+    }
+    void checkMouse(int type) {
+        for(dropdownButton b : buttons) {
+            b.checkMouse(type);
+        }
+    }
+    void setState() {
+        buttons.get(buttons.size() - 1).state = true;
+        selectedIndex = buttons.size() - 1;
+    }
+}
+
+class dropdownButton extends button {
+    buttonMenu menu;
+    float r1, r2, r3, r4;
+    dropdownButton(float x, float y, float w, float h, float r, String txt, color norm_0, color over_0, color down_0, color norm_1, color over_1, color down_1, buttonMenu menu) {
+        super(x, y, w, h, r, null, txt , norm_0, over_0, down_0, norm_1, over_1, down_1);
+        this.menu = menu;
+        this.state = false;
+    }
+    void stateChanged() {
+        for(dropdownButton b : menu.buttons) {
+            if(b == this) {
+                b.state = true;
+                menu.selectedIndex = menu.buttons.indexOf(this);
+            }else{
+                b.state = false;
+            }
+        }
+    }
+    void drawBackground() {
+        rect(x, y, w, h, r1, r2, r3, r4);
+    }
+    void drawLabel() {
+        if(txt == null) return;
+        textAlign(LEFT, CENTER);
+        textSize(w / 16);
+        fill(state ? 0 : 255);
+        text(txt, x - w / 2 + 5, y);
     }
 }

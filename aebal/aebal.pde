@@ -21,12 +21,12 @@ float songComplexity = 1; //How reactive the song is, aka make this lower if you
 float BACKGROUND_COLOR_FADE = 0.275; //Lerp value
 float TIMER_UPDATE_FREQUENCY = 500; //Debug timer update rate (millis)
 boolean DO_ENEMY_SPAWNING     = true;
-boolean ALLOW_DEBUG_ACTIONS   = true; //Space = skip, UP = increase complexity, DOWN = decrease complexity
+boolean ALLOW_DEBUG_ACTIONS   = false; //Space = skip, UP = increase complexity, DOWN = decrease complexity
 boolean REFRESH_SONG_METADATA = true; //Recheck song metadata, even if found in cache
 int gameSelect_songDisplayCount = 10; //How many songs in the Song Selector to display up and down
 
 boolean intense, cancerMode, keydown_SHIFT, checkTimes, textSFXPlaying, songEndScreenSkippable, mouseOverSong, paused, show_fade_in = true;
-int cancerCount, score, hitCount, gameFrameCount, durationInto, song_intensity_count, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1, nextVolumeSFXplay = -1;
+int monitorID, cancerCount, score, hitCount, gameFrameCount, durationInto, song_intensity_count, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1, nextVolumeSFXplay = -1;
 float gameFrameRateTotal, scrollWait, fps_tracker, gameSelect_songSelect, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, song_total_intensity, millisDelta, grayScaleTimer = 100;
 String settingsFileLoc, songDataFileLoc, previousScene, gameState = "gameSelect";
 int[] cancerKeys = {UP, UP, DOWN, DOWN, LEFT, RIGHT, LEFT, RIGHT, 66, 65, ENTER};
@@ -55,6 +55,7 @@ arrow a;
 settingButton[] settings, settings_left, settings_right;
 settingButton DEBUG_TIMINGS, DYNAMIC_BACKGROUND_COLOR, DO_POST_PROCESSING, BACKGROUND_BLOBS, BACKGROUND_FADE, DO_HIT_PROMPTS, NO_DAMAGE, RGB_ENEMIES, DO_CHROMA, DO_SHAKE, SHOW_FPS;
 button settings_button, back_button;
+buttonMenu monitorOptions;
 vol_slider volSlider;
 difficulty_slider difficultySlider;
 JSONObject menuSettings, songCache;
@@ -560,7 +561,17 @@ class floatingText {
 }
 
 void settings() {
-  fullScreen(P2D, 3);
+  settingsFileLoc = sketchPath("settings.json");
+  try {
+    assert sketchFile(settingsFileLoc).isFile();
+    menuSettings = loadJSONObject(settingsFileLoc);
+    monitorID = menuSettings.getInt("monitorID");
+    fullScreen(P2D, monitorID);
+  }catch(Throwable e) {
+    println("Settings file not found or was corrupt: " + e);
+    fullScreen(P2D, 1);
+  }
+
   smooth(4);
   PJOGL.setIcon(sketchPath("assets/images/aebal.png"));
 }
@@ -568,6 +579,22 @@ void settings() {
 void setup() {
   frameRate(FPS);
   surface.setTitle("Aebal");
+
+  monitorOptions = new buttonMenu(165, 65, 200, 30, color(225), color(220), color(215), color(30), color(40), color(50));
+  monitorOptions.addButton("1");
+  monitorOptions.setState();
+  monitorOptions.addButton("asdf");
+  monitorOptions.addButton("yo mama");
+
+
+
+  if(args != null && args.length > 0) {
+    for(int i = 0; i < args.length; i++) {
+      if(args[i].trim().toLowerCase().equals("debug")) {
+        ALLOW_DEBUG_ACTIONS = true;
+      }
+    }
+  }
 
   unimportantRandoms = new Random();
   timingList    = new HashMap();
@@ -643,6 +670,7 @@ void setup() {
     for(settingButton b : settings) {
       menuSettings.setBoolean(b.txt, b.state);
     }
+    menuSettings.setInt("monitorID", 1);
     saveJSONObject(menuSettings, settingsFileLoc);
   }
 
@@ -1229,6 +1257,7 @@ void draw() {
       volSlider.txt = "Volume - " + int(map(volSlider.val, volSlider.val_min, volSlider.val_max, 0, 100)) + '%';
       volSlider.draw();
       back_button.draw();
+      monitorOptions.draw();
       if(nextVolumeSFXplay > 0 && millis() > nextVolumeSFXplay) {
         volSlider.onRelease();
         nextVolumeSFXplay = -1;
@@ -1352,6 +1381,10 @@ void draw() {
 void exit() {
   println("Exiting, saving settings.");
   menuSettings.setFloat("volume", volSlider.val);
+  if(monitorID != monitorOptions.selectedIndex + 1) {
+    monitorID = monitorOptions.selectedIndex + 1;
+  }
+  menuSettings.setInt("monitorID", monitorID);
   saveJSONObject(menuSettings, settingsFileLoc);
   super.exit();
 }
@@ -1439,6 +1472,7 @@ void mousePressed() {
       b.checkMouse(MOUSE_PRESS);
     }
     volSlider.checkMouse(MOUSE_PRESS);
+    monitorOptions.checkMouse(MOUSE_PRESS);
   }else if(gameState.equals("gameSelect")) {
     difficultySlider.checkMouse(MOUSE_PRESS);
   }
@@ -1453,6 +1487,14 @@ void mouseReleased() {
     if(settings_button.active && settings_button.checkMouse(MOUSE_RELEASE)) {
       screenshot();
       setScene("settings");
+
+      monitorOptions.buttons = new ArrayList();
+      int i = 0;
+      for(String m : getMonitors()) {
+        monitorOptions.addButton(m);
+        if(++i == monitorID) monitorOptions.setState();
+      }
+
       unpause(false);
     }
   }
@@ -1461,6 +1503,7 @@ void mouseReleased() {
       b.checkMouse(MOUSE_RELEASE);
     }
     volSlider.checkMouse(MOUSE_RELEASE);
+    monitorOptions.checkMouse(MOUSE_RELEASE);
     if(back_button.active && back_button.checkMouse(MOUSE_RELEASE)) {
       screenshot();
       returnScene();
