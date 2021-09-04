@@ -16,16 +16,16 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 
-float FPS = 1000; //Wish I could uncap this
-float songComplexity = 1; //How reactive the song is, aka make this lower if your song is really loud/bassy
-float BACKGROUND_COLOR_FADE = 0.275; //Lerp value
-float TIMER_UPDATE_FREQUENCY = 500; //Debug timer update rate (millis)
-boolean DO_ENEMY_SPAWNING     = true;
-boolean ALLOW_DEBUG_ACTIONS   = false; //Space = skip, UP = increase complexity, DOWN = decrease complexity
 boolean REFRESH_SONG_METADATA = true; //Recheck song metadata, even if found in cache
-int gameSelect_songDisplayCount = 10; //How many songs in the Song Selector to display up and down
+boolean DO_ENEMY_SPAWNING     = true;
+float TIMER_UPDATE_FREQUENCY = 500; //Debug timer update rate (millis)
+float BACKGROUND_COLOR_FADE = 0.275; //Lerp value
+float songComplexity = 1.2;
+float FPS = 1000; //Wish I could uncap this
+int GAMESELECT_SONGDISPLAYCOUNT = 10; //How many songs in the Song Selector to display up and down
+int MAX_SIMULTANEOUS_DAMAGE = 100; //Mono got mad at the circles
 
-boolean intense, cancerMode, keydown_SHIFT, checkTimes, textSFXPlaying, songEndScreenSkippable, mouseOverSong, paused, show_fade_in = true;
+boolean intense, allowDebugActions, cancerMode, keydown_SHIFT, checkTimes, textSFXPlaying, songEndScreenSkippable, mouseOverSong, paused, show_fade_in = true;
 int monitorID, cancerCount, score, hitCount, gameFrameCount, durationInto, song_intensity_count, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1, nextVolumeSFXplay = -1;
 float gameFrameRateTotal, scrollWait, fps_tracker, gameSelect_songSelect, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, song_total_intensity, millisDelta, grayScaleTimer = 100;
 String settingsFileLoc, songDataFileLoc, previousScene, gameState = "gameSelect";
@@ -149,6 +149,15 @@ void setKeys(boolean state) {
   }
 }
 
+void updateMonitorOptions() {
+  monitorOptions.buttons = new ArrayList();
+  int i = 0;
+  for(String m : getMonitors()) {
+    monitorOptions.addButton(m);
+    if(++i == monitorID) monitorOptions.setState();
+  }
+}
+
 void pause(boolean setFPS) {
   paused = true;
   if(gameState.equals("game")) { 
@@ -201,7 +210,7 @@ void gotHit(int scoreDeduction, int timerDelay, boolean clearEnemies, int indivi
   grayScaleTimer = 0;
   if(!NO_DAMAGE.state) {
     hitCount++;
-    score -= scoreDeduction;
+    score -= min(scoreDeduction, MAX_SIMULTANEOUS_DAMAGE);
     noScoreTimer = timerDelay;
     if(clearEnemies) resetEnemies(individualPointReduction);
     hitSound.playR();
@@ -591,7 +600,7 @@ void setup() {
   if(args != null && args.length > 0) {
     for(int i = 0; i < args.length; i++) {
       if(args[i].trim().toLowerCase().equals("debug")) {
-        ALLOW_DEBUG_ACTIONS = true;
+        allowDebugActions = true;
       }
     }
   }
@@ -728,6 +737,8 @@ void setup() {
   for(int i = 0; i < previousPos.length; i++) {
     previousPos[i] = pos.copy();
   }
+
+  updateMonitorOptions();
 }
 
 void draw() {
@@ -763,8 +774,8 @@ void draw() {
       gameSelect_songSelect_actual = Math.floorMod(gameSelect_songSelect_actual, songList.size());
       gameSelect_songSelect = lerp(gameSelect_songSelect, gameSelect_songSelect_actual, 0.1);
 
-      int min_s = gameSelect_songSelect_actual - gameSelect_songDisplayCount;
-      int max_s = min(gameSelect_songSelect_actual + gameSelect_songDisplayCount, songList.size());
+      int min_s = gameSelect_songSelect_actual - GAMESELECT_SONGDISPLAYCOUNT;
+      int max_s = min(gameSelect_songSelect_actual + GAMESELECT_SONGDISPLAYCOUNT, songList.size());
       textFont(defaultFont, 50);
 
       pushMatrix();
@@ -1185,7 +1196,15 @@ void draw() {
       fill(255, 200);
       textFont(songFont, 48);
       textAlign(LEFT, BOTTOM);
-      text(songP.toString(), 10, height - 10);
+      text(songP.title, 10, height - 10);
+      float durationComplete = ((float)song.sound.position()) / song.sound.length();
+      rectMode(CORNERS);
+      noStroke();
+      fill(255);
+      rect(0, height - 4, width * durationComplete, height);
+      fill(64);
+      rect(width * durationComplete, height - 4, width, height);
+
       textFont(defaultFont);
 
       if(DO_POST_PROCESSING.state) {
@@ -1383,6 +1402,7 @@ void exit() {
   menuSettings.setFloat("volume", volSlider.val);
   if(monitorID != monitorOptions.selectedIndex + 1) {
     monitorID = monitorOptions.selectedIndex + 1;
+    println("Monitor ID: " + monitorID);
   }
   menuSettings.setInt("monitorID", monitorID);
   saveJSONObject(menuSettings, settingsFileLoc);
@@ -1426,7 +1446,7 @@ void keyPressed(KeyEvent e) {
       exit();
     }
   }else if(gameState == "game") {
-    if(ALLOW_DEBUG_ACTIONS) {
+    if(allowDebugActions) {
       switch(keyCode) {
         case UP: {
           songComplexity += 0.1;
@@ -1487,14 +1507,7 @@ void mouseReleased() {
     if(settings_button.active && settings_button.checkMouse(MOUSE_RELEASE)) {
       screenshot();
       setScene("settings");
-
-      monitorOptions.buttons = new ArrayList();
-      int i = 0;
-      for(String m : getMonitors()) {
-        monitorOptions.addButton(m);
-        if(++i == monitorID) monitorOptions.setState();
-      }
-
+      updateMonitorOptions();
       unpause(false);
     }
   }
