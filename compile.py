@@ -1,8 +1,10 @@
-import os, shutil
+import shutil, os
 
 os.chdir(loc := os.path.dirname(__file__))
 if os.path.isdir("aebalExport"):
     shutil.rmtree(f"aebalExport")
+if os.path.isfile("aebal.zip"):
+    os.remove("aebal.zip")
 os.system(f"""processing-java --sketch={loc}/aebal --output={loc}/aebalExport --export --platform windows""")
 shutil.rmtree(f"aebalExport/source")
 shutil.copytree("gameSongs", songDir := "aebalExport/songs")

@@ -578,6 +578,7 @@ void settings() {
     fullScreen(P2D, monitorID);
   }catch(Throwable e) {
     println("Settings file not found or was corrupt: " + e);
+    monitorID = 1;
     fullScreen(P2D, 1);
   }
 
@@ -700,7 +701,12 @@ void setup() {
   }
 
   for(String songName : new File(sketchPath("Songs")).list()) {
-    songList.add(new songElement(songCache, sketchPath("Songs/" + songName)));
+    try {
+      songElement songElm = new songElement(songCache, sketchPath("Songs/" + songName));
+      songList.add(songElm);
+    }catch(Throwable e) {
+      println("Song file unreadable: " + songName);
+    }
   }
   saveJSONObject(songCache, songDataFileLoc);
   songList.add(new songElement("///addSong", "+ Add Song"));
