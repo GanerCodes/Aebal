@@ -27,8 +27,8 @@ int MAX_SIMULTANEOUS_DAMAGE = 100; //Mono got mad at the circles
 
 boolean intense, allowDebugActions, cancerMode, keydown_SHIFT, checkTimes, textSFXPlaying, songEndScreenSkippable, mouseOverSong, paused, show_fade_in = true;
 int monitorID, cancerCount, score, hitCount, gameFrameCount, durationInto, song_intensity_count, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1, nextVolumeSFXplay = -1;
-float gameFrameRateTotal, scrollWait, fps_tracker, gameSelect_songSelect, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, song_total_intensity, millisDelta, grayScaleTimer = 100;
-String settingsFileLoc, songDataFileLoc, previousScene, gameState = "gameSelect";
+float gameFrameRateTotal, scrollWait, fps_tracker, gameSelect_songSelect, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, song_total_intensity, millisDelta, fadeDuration = 5000, fadeOpacityStart = 400, fadeOpacityEnd = 0, grayScaleTimer = 100;
+String settingsFileLoc, songDataFileLoc, previousScene, gameState = "title";
 int[] cancerKeys = {UP, UP, DOWN, DOWN, LEFT, RIGHT, LEFT, RIGHT, 66, 65, ENTER};
 PVector pos, randTrans, chroma_r, chroma_g, chroma_b;
 PVector[] previousPos;
@@ -748,24 +748,40 @@ void setup() {
 }
 
 void draw() {
-  if(focused) {
+  if(focused || gameState.equals("title")) {
     if(paused) unpause(true);
   }else{
     if(!paused) pause(true);
     return;
   }
-
-  if(millis() > timerUpdateTime) {
-    checkTimes = true;
-    timerUpdateTime = millis() + TIMER_UPDATE_FREQUENCY;
-  }else{
-    checkTimes = false;
-  }
-
   previousCursor = activeCursor;
+
+  if(DEBUG_TIMINGS.state) {
+    if(millis() > timerUpdateTime) {
+      checkTimes = true;
+      timerUpdateTime = millis() + TIMER_UPDATE_FREQUENCY;
+    }else{
+      checkTimes = false;
+    }
+  }
+  
   durationInto = int(adjMillis() - sceneOffsetMillis);
 
   switch(gameState) {
+    case "title": {
+      background(0);
+      imageMode(CENTER);
+      pushMatrix();
+      translate(width / 2, text_logo.height * (1 + 0.07 * sin(durationInto / 800.0)));
+      rotate(sin(0.2 + durationInto / 500.0) / 40.0);
+      image(text_logo, 0, 0);
+      popMatrix();
+      if(durationInto > 5000) {
+        textFont(songFont, 48);
+        textAlign(CENTER, CENTER);
+        text("<Press any key to begin>", width / 2, 0.8 * height);
+      }
+    } break;
     case "gameSelect": {
       activeCursor = ARROW;
       background(0);
@@ -1344,8 +1360,8 @@ void draw() {
   }
 
   if(show_fade_in) {
-    if(durationInto < 128) {
-      fill(0, 128 - durationInto);
+    if(durationInto < fadeDuration) {
+      fill(0, clampMap(durationInto, 0, fadeDuration, fadeOpacityStart, fadeOpacityEnd));
       noStroke();
       rectMode(CORNER);
       rect(-5, -5, width + 10, height + 10);
@@ -1421,68 +1437,86 @@ void keyPressed(KeyEvent e) {
   }
   setKeys(true);
 
-  if(keyCode == cancerKeys[cancerCount]) {
-    cancerCount++;
-    if(cancerCount == cancerKeys.length) {
-      cancerMode = !cancerMode;
-      println(cancerMode);
-      cancerCount = 0;
-    }
-  }else{
-    cancerCount = 0;
-  }
-
   if(key == ESC) {
     key = 0;
     if(gameState.equals("levelSummary") || ((gameState.equals("game") || gameState.equals("pause") || gameState.equals("settings")) && keydown_SHIFT)) {
       gotoLevelSelect();
-    }else if(gameState.equals("game")) {
-      pause(false);
-      screenshot();
-      setScene("pause");
-    }else if(gameState.equals("pause")){
-      setScene("game");
-      screenshot();
-      unpause(false);
-    }else if(gameState.equals("settings")) {
-      screenshot();
-      returnScene();
-      volSlider.activate();
-    }else if(gameState.equals("gameSelect")) {
-      exit();
-    }
-  }else if(gameState == "game") {
-    if(allowDebugActions) {
-      switch(keyCode) {
-        case UP: {
-          songComplexity += 0.1;
+    }else{
+      switch(gameState) {
+        case "game": {
+          pause(false);
+          screenshot();
+          setScene("pause");
         } break;
-        case DOWN: {
-          songComplexity -= 0.1;
+        case "pause": {
+          setScene("game");
+          screenshot();
+          unpause(false);
         } break;
-        default: {
-          if(key == ' ') {
-            song.sound.skip(30 * 1000);
-          }
+        case "settings": {
+          screenshot();
+          returnScene();
+          volSlider.activate();
+        } break;
+        case "gameSelect": {
+          exit();
+        } break;
+        case "title": {
+          if(durationInto > 4000) exit();
         } break;
       }
     }
-  }else if(gameState.equals("gameSelect")) {
-    if(keyCode == UP) {
-      moveSongSel(-1);
-    }else if(keyCode == DOWN) {
-      moveSongSel(1);
+  }else{
+    if(keyCode == cancerKeys[cancerCount]) {
+      cancerCount++;
+      if(cancerCount == cancerKeys.length) {
+        cancerMode = !cancerMode;
+        cancerCount = 0;
+      }
+    }else{
+      cancerCount = 0;
+    }
+    switch(gameState) {
+      case "game": {
+        if(allowDebugActions) {
+          switch(keyCode) {
+            case UP: {
+              songComplexity += 0.1;
+            } break;
+            case DOWN: {
+              songComplexity -= 0.1;
+            } break;
+            default: {
+              if(key == ' ') {
+                song.sound.skip(30 * 1000);
+              }
+            } break;
+          }
+        }
+      } break;
+      case "gameSelect": {
+        if(keyCode == ENTER || keyCode == 32) {
+          selectLevel(songList.get(gameSelect_songSelect_actual));
+        }else if(keyCode == UP) {
+          moveSongSel(-1);
+        }else if(keyCode == DOWN) {
+          moveSongSel(1);
+        }
+      } break;
+      case "title": {
+        if(durationInto > 1750 && keyCode != 127) { //For some reason `del` key is pressed automatically sometimes??
+          fadeOpacityStart = 128;
+          fadeDuration = 128;
+          setScene("gameSelect");
+        }
+      } break;
     }
   }
 }
 
 void keyReleased() {
   setKeys(false);
-  if(gameState.equals("gameSelect")) {
-    if(keyCode == ENTER || keyCode == 32) {
-      selectLevel(songList.get(gameSelect_songSelect_actual));
-    }
-  }else if(gameState.equals("levelSummary")) {
+  if(gameState.equals("levelSummary")) {
     if(songEndScreenSkippable) {
       setScene("gameSelect");
       song.sound.close();
