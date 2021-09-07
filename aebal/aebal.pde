@@ -37,13 +37,11 @@ Sound[] soundList;
 Minim minim;
 FFT fft;
 color backColor, globalObjColor;
-PGraphics back, back2;
+PGraphics back;
 PImage screen, text_logo, image_gear, image_back, image_settings, image_paused;
 PFont defaultFont, songFont;
-PShader bubbleShader, chroma, reduceOpacity, grayScale;
+PShader bubbleShader, chroma, reduceOpacity, grayScale, bloom;
 DecimalFormat timerFormat;
-PostFX postProcessing;
-PostFXBuilder postProcessingBuilder;
 ArrayList<obj> objs = new ArrayList();
 ArrayList<bubble> bubbles = new ArrayList();
 ArrayList<songElement> songList = new ArrayList();
@@ -141,6 +139,15 @@ void gotoLevelSelect() {
   setScene("gameSelect");
   resetLevel();
   screenshot();
+}
+
+void transitionFromLevelSummary() {
+  if(songEndScreenSkippable) {
+    setScene("gameSelect");
+    song.sound.close();
+    resetLevel();
+    songEndScreenSkippable = false;
+  }
 }
 
 void setKeys(boolean state) {
@@ -255,6 +262,7 @@ void selectLevel(songElement song) {
   resetLevel();
   bubbles = new ArrayList();
   floatingPrompts = new ArrayList();
+  bubbleLayer = createGraphics(width, height, P2D);
   for(int i = 0; i < 4; i++) {
     bubbles.add(new bubble(vec2(s_random(0, width), s_random(0, height))));
   }
@@ -377,11 +385,9 @@ class field {
 
 class bubble {
   PVector loc, vel;
-  PGraphics effect;
   float timer_offset;
   int size = 750;
   bubble(PVector loc) {
-    effect = createGraphics(size, size, P2D);
     this.loc = loc;
     float ang = s_random(0, TWO_PI);
     vel = mulVec(
@@ -403,15 +409,7 @@ class bubble {
     if(loc.x > width  + adjSize) { loc.x = -adjSize; } else if(loc.x < -adjSize) { loc.x = width  + adjSize; }
     if(loc.y > height + adjSize) { loc.y = -adjSize; } else if(loc.y < -adjSize) { loc.y = height + adjSize; }
   }
-  void draw(PGraphics base) {
-    bubbleShader.set("clr", 1.2 * (pow(c, 0.33)));
-    bubbleShader.set("mul", c / 5.0);
-    bubbleShader.set("opacity", 0.001 + pow(c, 0.75) / 30.0);
-    bubbleShader.set("u_time", adjMillis() / 1000.0 + timer_offset);
-    effect.filter(bubbleShader);
-    base.image(effect, loc.x, loc.y);
-
-    // -----------------------------------------------------
+  // void draw(PGraphics base) {
     // Sparkyjohn's failed contribution. Still here for reference if desired.
     // Texure filterTexture = new Texture(effect, effect.texture.width, effect.texture.height, effect.texture.getParameters());
     // filterTexture.invertedY(true);
@@ -433,8 +431,29 @@ class bubble {
     // effect.endShape();
     // effect.endDraw();
     // End sparkyjohn's contrib.
-    // -----------------------------------------------------
+  // }
+}
+
+PGraphics bubbleLayer;
+void drawBubbles(PGraphics base) {
+  FloatList coord_x = new FloatList();
+  FloatList coord_y = new FloatList();
+  FloatList timeOff = new FloatList();
+  float currentTime = adjMillis() / 1000.0;
+  for(bubble b : bubbles) {
+    coord_x.append(b.loc.x / width);
+    coord_y.append(1 - b.loc.y / height);
+    timeOff.append(currentTime + b.timer_offset);
   }
+  bubbleShader.set("clr", 1.2 * (pow(c, 0.33)));
+  bubbleShader.set("mul", c / 5.0);
+  bubbleShader.set("opacity", 0.001 + pow(c, 0.75) / 30.0);
+  bubbleShader.set("coord_x", coord_x.array());
+  bubbleShader.set("coord_y", coord_y.array());
+  bubbleShader.set("timeOff", timeOff.array());
+  bubbleLayer.filter(bubbleShader);
+  base.imageMode(CORNER);
+  base.image(bubbleLayer, 0, 0);
 }
 
 class arrow {
@@ -506,16 +525,18 @@ class arrow {
 }
 
 class obj {
-  PVector loc, vel;
+  PVector loc, ploc, vel;
   int timer;
-  obj(float x, float y, float vx, float vy) {
-    this.loc = vec2(x, y);
-    this.vel = vec2(vx, vy);
-    timer = 1;
-  }
   obj(PVector loc, PVector vel) {
     this.loc = loc;
+    this.ploc = loc;
     this.vel = vel;
+    timer = 1;
+  }
+  obj(float x, float y, float vx, float vy) {
+    this.loc = new PVector(x, y);
+    this.ploc = this.loc.copy();
+    this.vel = new PVector(vx, vy);
     timer = 1;
   }
   
@@ -528,6 +549,7 @@ class obj {
   void move() {
     float speed = int(c * 14.5) / 6.25 + 0.1;
 
+    ploc = loc.copy();
     loc.add(vel.copy().mult(speed * (60 / frameRate)));
     if (timer == 3) {
       score++;
@@ -545,7 +567,18 @@ class obj {
     }
   }
   void draw(PGraphics base) {
-    base.circle(loc.x, loc.y, 20);
+    if(BACKGROUND_FADE.state) {
+      // base.noStroke();
+      // base.circle(ploc.x, ploc.y, 20);
+      base.strokeWeight(20);
+      back.stroke(globalObjColor);
+      back.strokeCap(SQUARE);
+      base.line(ploc.x, ploc.y, loc.x, loc.y);
+      base.noStroke();
+      base.circle(loc.x, loc.y, 20);
+    }else{
+      base.circle(loc.x, loc.y, 20);
+    }
   }
 }
 
@@ -637,7 +670,7 @@ void setup() {
   difficultySlider = new difficulty_slider(1357, height * 4/5, 500, 35, songComplexity, 0.75, 2 , "Difficulty", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
   settings = new settingButton[] {
     DYNAMIC_BACKGROUND_COLOR = new settingButton(0, 0, 75, 75, 5, "Dynamic Background"  , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
-    DO_POST_PROCESSING       = new settingButton(0, 0, 75, 75, 5, "Bloom"               , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
+    DO_POST_PROCESSING       = new settingButton(0, 0, 75, 75, 5, "Color Shaders"       , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     BACKGROUND_BLOBS         = new settingButton(0, 0, 75, 75, 5, "Background Blobs"    , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     BACKGROUND_FADE          = new settingButton(0, 0, 75, 75, 5, "Background Fade"     , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     DO_HIT_PROMPTS           = new settingButton(0, 0, 75, 75, 5, "Score Ticks"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
@@ -721,22 +754,18 @@ void setup() {
   songFont    = createFont(sketchPath("assets/fonts/songFont.ttf"   ), 64 );
 
   back  = createGraphics(width, height, P2D);
-  back2 = createGraphics(width, height, P2D);
-
   strokeCap(PROJECT);
 
   f = new field(max(width, height));
   a = new arrow(width / 2, height / 2, 0, 500, 1700);
-  chroma =        loadShader(sketchPath("assets/shaders/rgb_offset.glsl"   ));
-  grayScale =     loadShader(sketchPath("assets/shaders/gray.glsl"         ));
-  bubbleShader =  loadShader(sketchPath("assets/shaders/bubble.glsl"       ));
+  chroma        = loadShader(sketchPath("assets/shaders/rgb_offset.glsl"   ));
+  grayScale     = loadShader(sketchPath("assets/shaders/gray.glsl"         ));
+  bubbleShader  = loadShader(sketchPath("assets/shaders/bubble.glsl"       ));
   reduceOpacity = loadShader(sketchPath("assets/shaders/reduceOpacity.glsl"));
+  bloom         = loadShader(sketchPath("assets/shaders/bloom.glsl"        ));
   chroma_r = vec2();
   chroma_g = vec2();
   chroma_b = vec2();
-  postProcessing = new PostFX(this);
-  postProcessing.preload(BloomPass.class);
-  postProcessing.preload(SaturationVibrancePass.class);
 
   pos = vec2(width / 2, height / 2);
   previousPos = new PVector[1];
@@ -890,7 +919,10 @@ void draw() {
     case "game": {
       TT("Physics");
       fft.forward(song.sound.mix);
-      float tmp_intensity = findComplexity(song.sound.mix.toArray()) * (0.65 + song.sound.mix.level());
+      float tmp_intensity = findComplexity(song.sound.mix.toArray()) * (0.65 + (0.2 + song.sound.mix.level()) / 2.0);
+      if(tmp_intensity < 0.1) {
+        tmp_intensity = pow(tmp_intensity, 1.0 / 3) / 4.65;
+      }
       c = tmp_intensity * songComplexity;
       song_total_intensity += tmp_intensity;
       song_intensity_count++;
@@ -1102,13 +1134,10 @@ void draw() {
       }
       if(BACKGROUND_BLOBS.state) {
         TT("Blobs");
-        for(bubble b : bubbles) {
-          b.draw(back);
-        }
+        drawBubbles(back);
         TT("Blobs");
       }
 
-      TT("Enemies+");
       if(BACKGROUND_FADE.state) {
         back.fill(255);
         back.stroke(255);
@@ -1118,21 +1147,23 @@ void draw() {
       colorMode(HSB);
       globalObjColor = lerpColor(globalObjColor, (intense && RGB_ENEMIES.state) ? color((adjMillis() / 5.0) % 255, 164, 255) : color(0, 255, 255), 4.0 / frameRate);
 
-      back.noStroke();
+      if(BACKGROUND_FADE.state) {
+        back.stroke(globalObjColor);
+      }else{
+        back.noStroke();
+      }
       back.fill(globalObjColor);
+      TT("Enemies");
       for(obj o : objs) {
         o.draw(back);
       }
+      TT("Enemies");
       a.drawHead(back, 128);
       back.endDraw();
       image(back, 0, 0);
       a.drawLine();
-      back2.beginDraw();
-        back2.clear();
-        stroke(255);
-        a.drawHead(back2, 0);
-      back2.endDraw();
-      image(back2, 0, 0);
+      stroke(255);
+      a.drawHead(g, 0);
       noStroke();
       fill(255);
       rect(pos.x, pos.y, 20, 20);
@@ -1148,17 +1179,18 @@ void draw() {
         stroke(255);
         f.draw();
       } popMatrix();
-      TT("Enemies+");
 
       //post processing
       if(DO_POST_PROCESSING.state) {
-        TT("PostFX");
-        postProcessingBuilder = postProcessing.render().bloom(0.5, 20, 40);
+        TT("PostProcessing");
+        bloom.set("bloom_intensity", 2.0 * c / 81.0);
         if(intense) {
-          postProcessingBuilder.saturationVibrance(0.4 + c / 3.0, 0.4 + c / 3.0);
+          bloom.set("saturation", 1 + c / 3.33);
+        }else{
+          bloom.set("saturation", 1.0);
         }
-        postProcessingBuilder.compose();
-        TT("PostFX");
+        filter(bloom);
+        TT("PostProcessing");
       }
       if(DO_CHROMA.state) {
         TT("ChromaAbbr");
@@ -1497,9 +1529,9 @@ void keyPressed(KeyEvent e) {
       case "gameSelect": {
         if(keyCode == ENTER || keyCode == 32) {
           selectLevel(songList.get(gameSelect_songSelect_actual));
-        }else if(keyCode == UP) {
+        }else if(keyCode == UP || key == 'w') {
           moveSongSel(-1);
-        }else if(keyCode == DOWN) {
+        }else if(keyCode == DOWN || key == 's') {
           moveSongSel(1);
         }
       } break;
@@ -1516,14 +1548,7 @@ void keyPressed(KeyEvent e) {
 
 void keyReleased() {
   setKeys(false);
-  if(gameState.equals("levelSummary")) {
-    if(songEndScreenSkippable) {
-      setScene("gameSelect");
-      song.sound.close();
-      resetLevel();
-      songEndScreenSkippable = false;
-    }
-  }
+  if(gameState.equals("levelSummary")) transitionFromLevelSummary();
 }
 
 void mousePressed() {
@@ -1551,25 +1576,39 @@ void mouseReleased() {
       unpause(false);
     }
   }
-  if(gameState.equals("settings")) {
-    for(settingButton b : settings) {
-      b.checkMouse(MOUSE_RELEASE);
-    }
-    volSlider.checkMouse(MOUSE_RELEASE);
-    monitorOptions.checkMouse(MOUSE_RELEASE);
-    if(back_button.active && back_button.checkMouse(MOUSE_RELEASE)) {
-      screenshot();
-      returnScene();
-      volSlider.activate();
-    }
-  }else if(gameState.equals("gameSelect")) {
-    if(back_button.active && back_button.checkMouse(MOUSE_RELEASE)) {
-      exit();
-    }
-    difficultySlider.checkMouse(MOUSE_RELEASE);
-  }else if(gameState.equals("pause")) {
-    if(back_button.active && back_button.checkMouse(MOUSE_RELEASE)) {
-      gotoLevelSelect();
+  switch(gameState) {
+    case "settings": {
+      for(settingButton b : settings) {
+        b.checkMouse(MOUSE_RELEASE);
+      }
+      volSlider.checkMouse(MOUSE_RELEASE);
+      monitorOptions.checkMouse(MOUSE_RELEASE);
+      if(back_button.active && back_button.checkMouse(MOUSE_RELEASE)) {
+        screenshot();
+        returnScene();
+        volSlider.activate();
+      }
+    } break;
+    case "gameSelect": {
+      if(back_button.active && back_button.checkMouse(MOUSE_RELEASE)) {
+        exit();
+      }
+      difficultySlider.checkMouse(MOUSE_RELEASE);
+    } break;
+    case "pause": {
+      if(back_button.active && back_button.checkMouse(MOUSE_RELEASE)) {
+        gotoLevelSelect();
+      }
+    } break;
+    case "levelSummary": {
+      transitionFromLevelSummary();
+    } break;
+    case "title": {
+      if(durationInto > 1750) {
+        fadeOpacityStart = 128;
+        fadeDuration = 128;
+        setScene("gameSelect");
+      }
     }
   }
 }
