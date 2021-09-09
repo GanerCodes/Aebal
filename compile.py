@@ -1,6 +1,6 @@
 import shutil, os
 
-doExport = False
+doExport = True
 
 if doExport:
     os.chdir(loc := os.path.dirname(__file__))
@@ -13,7 +13,7 @@ if doExport:
     shutil.copytree("gameSongs", songDir := "aebalExport/songs")
     shutil.copytree("aebal/assets", assetDir := "aebalExport/assets")
     shutil.make_archive("aebal", 'zip', "aebalExport")
-    shutil.rmtree(f"aebalExport")
+    # shutil.rmtree(f"aebalExport")
 
 fileList = []
 def checkFolder(path, rec = True):
