@@ -599,14 +599,6 @@ void settings() {
 void setup() {
   frameRate(FPS);
   surface.setTitle("Aebal");
-  surface.setResizable(true);
-
-  monitorOptions = new buttonMenu(165, 65, 200, 30, color(225), color(220), color(215), color(30), color(40), color(50));
-  monitorOptions.addButton("1");
-  monitorOptions.setState();
-  monitorOptions.addButton("asdf");
-  monitorOptions.addButton("yo mama");
-
 
   if(args != null && args.length > 0) {
     for(int i = 0; i < args.length; i++) {
@@ -645,6 +637,7 @@ void setup() {
 
   volSlider        = new vol_slider       (gameWidth / 2, gameHeight / 1.175, 600, 35, 0             , -30 , 20, "Volume"    , #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
   difficultySlider = new difficulty_slider(1357, gameHeight * 4/5, 500, 35, songComplexity, 0.75, 2 , "Difficulty", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
+  monitorOptions = new buttonMenu(165, 65, 200, 30, color(225), color(220), color(215), color(30), color(40), color(50));
   settings = new settingButton[] {
     DYNAMIC_BACKGROUND_COLOR = new settingButton(0, 0, 75, 75, 5, "Dynamic Background"  , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     DO_POST_PROCESSING       = new settingButton(0, 0, 75, 75, 5, "Color Shaders"       , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
@@ -1452,6 +1445,23 @@ void draw() {
   if(timerUpdateTime == -1) timerUpdateTime = millis() + TIMER_UPDATE_FREQUENCY;
 
   popMatrix();
+
+  if(scaleFact == scaleFactH) {
+    rectMode(CORNER);
+    fill(0);
+    noStroke();
+    float t = (width - gameWidth * scaleFact) / 2.0;
+    rect(0, 0, t, height);
+    rect(width - t, 0, t, height);
+  }else{
+    rectMode(CORNER);
+    fill(0);
+    noStroke();
+    float t = (height - gameHeight * scaleFact) / 2.0;
+    rect(0, 0, width, t);
+    rect(0, height - t, width, t);
+  }
+
 }
 
 void exit() {
