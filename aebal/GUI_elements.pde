@@ -54,7 +54,7 @@ class button {
     }
     void stateChanged() {}
     boolean checkMouse(int type) {
-        boolean over = mouseX > x - w/2 && mouseX < x + w/2 && mouseY > y - h/2 && mouseY < y + h/2;
+        boolean over = curX > x - w/2 && curX < x + w/2 && curY > y - h/2 && curY < y + h/2;
         if(over && active && type == MOUSE_RELEASE && over_1 != -1) {
             state = !state;
             stateChanged();
@@ -168,7 +168,7 @@ class slider {
     }
     boolean checkMouse(int type) {
         float offsetX = w / 2 - h / 2;
-        boolean over = (mouseX > x - offsetX && mouseX < x + offsetX && mouseY > y - h / 2 && mouseY < y + h / 2) || dist(mouseX, mouseY, getMappedVal(), y) < h / 2 * ballHfactor || dist(mouseX, mouseY, x - offsetX, y) < h / 2 || dist(mouseX, mouseY, x + offsetX, y) < h / 2;
+        boolean over = (curX > x - offsetX && curX < x + offsetX && curY > y - h / 2 && curY < y + h / 2) || dist(curX, curY, getMappedVal(), y) < h / 2 * ballHfactor || dist(curX, curY, x - offsetX, y) < h / 2 || dist(curX, curY, x + offsetX, y) < h / 2;
         boolean pre_active = active;
         if(type > 0) active = type == MOUSE_PRESS && over; //this line is sex
         if(pre_active && !active) {
@@ -179,7 +179,7 @@ class slider {
     void draw() {
         float pVal = val;
         if(active) {
-            val = constrain(map(mouseX, x - w / 2, x + w / 2, val_min, val_max), min(val_min, val_max), max(val_min, val_max));
+            val = constrain(map(curX, x - w / 2, x + w / 2, val_min, val_max), min(val_min, val_max), max(val_min, val_max));
             if(val != pVal) onChange();
         }
         boolean mouseOver = checkMouse(MOUSE_OVER);

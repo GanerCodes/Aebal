@@ -24,9 +24,10 @@ float songComplexity = 1.2;
 float FPS = 1000; //Wish I could uncap this
 int GAMESELECT_SONGDISPLAYCOUNT = 10; //How many songs in the Song Selector to display up and down
 int MAX_SIMULTANEOUS_DAMAGE = 100; //Mono got mad at the circles
+int gameWidth = 1920, gameHeight = 1080; //xdd
 
 boolean intense, allowDebugActions, cancerMode, keydown_SHIFT, checkTimes, textSFXPlaying, songEndScreenSkippable, mouseOverSong, paused, show_fade_in = true;
-int monitorID, cancerCount, score, hitCount, gameFrameCount, durationInto, song_intensity_count, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1, nextVolumeSFXplay = -1;
+int curX, curY, monitorID, cancerCount, score, hitCount, gameFrameCount, durationInto, song_intensity_count, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1, nextVolumeSFXplay = -1;
 float gameFrameRateTotal, scrollWait, fps_tracker, gameSelect_songSelect, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, song_total_intensity, millisDelta, fadeDuration = 5000, fadeOpacityStart = 400, fadeOpacityEnd = 0, grayScaleTimer = 100;
 String settingsFileLoc, songDataFileLoc, previousScene, gameState = "title";
 int[] cancerKeys = {UP, UP, DOWN, DOWN, LEFT, RIGHT, LEFT, RIGHT, 66, 65, ENTER};
@@ -103,7 +104,7 @@ void moveSongSel(int a) {
 }
 
 PVector generateLoc(float d) {
-  float largestAxisSize = max(width, height);
+  float largestAxisSize = max(gameWidth, gameHeight);
   float a = random(-PI, PI);
   float r = random(largestAxisSize + 12, largestAxisSize + d);
   float cosA = cos(a);
@@ -118,7 +119,8 @@ void addEnemy(PVector loc, PVector vel) {
 void screenshot() {
   screen = get(); //I can't figure out how to use just the back buffer because I'm tired and dumb so I'm doing this
   back.beginDraw();
-  back.background(screen);
+  back.imageMode(CORNER);
+  back.image(screen, 0, 0, back.width, back.height);
   back.endDraw();
 }
 
@@ -201,7 +203,7 @@ void fadeBack(float mul, int opacity) {
   background(0);
   image(back, 0, 0);
   fill(0, constrain(durationInto * mul * 1.25, 0, opacity));
-  rect(-5, -5, width + 10, height + 10);
+  rect(-5, -5, gameWidth + 10, gameHeight + 10);
 }
 
 void resetEnemies(int scoreDeduction) {
@@ -232,8 +234,8 @@ void resetLevel() {
   song_intensity_count = 0;
   textSFX.sound.pause();
   textSFX.sound.rewind();
-  f = new field(max(width, height));
-  a = new arrow(width / 2, height / 2, 0, 500, 1700);
+  f = new field(max(gameWidth, gameHeight));
+  a = new arrow(gameWidth / 2, gameHeight / 2, 0, 500, 1700);
   back.beginDraw();
   back.clear();
   back.endDraw();
@@ -262,9 +264,9 @@ void selectLevel(songElement song) {
   resetLevel();
   bubbles = new ArrayList();
   floatingPrompts = new ArrayList();
-  bubbleLayer = createGraphics(width, height, P2D);
+  bubbleLayer = createGraphics(gameWidth, gameHeight, P2D);
   for(int i = 0; i < 4; i++) {
-    bubbles.add(new bubble(vec2(s_random(0, width), s_random(0, height))));
+    bubbles.add(new bubble(vec2(s_random(0, gameWidth), s_random(0, gameHeight))));
   }
   int randomSeed = song.title.hashCode();
   println("Random seed for \"" + song.title + "\": " + randomSeed);
@@ -373,13 +375,13 @@ class field {
     noFill();
     strokeWeight(10);
     stroke(255);
-    rect(width / 2, height / 2, min(size, width - 5), min(size, height - 5));
+    rect(gameWidth / 2, gameHeight / 2, min(size, gameWidth - 5), min(size, gameHeight - 5));
   }
   void update() {
     float mn = size / 2 - 10 - 5;
-    pos.x = constrain(mouseX, max(width  / 2 - mn, 15), min(width  / 2 + mn, width  - 15));
-    pos.y = constrain(mouseY, max(height / 2 - mn, 15), min(height / 2 + mn, height - 15));
-    isOutside = mouseX != pos.x || mouseY != pos.y;
+    pos.x = constrain(curX, max(gameWidth  / 2 - mn, 15), min(gameWidth  / 2 + mn, gameWidth  - 15));
+    pos.y = constrain(curY, max(gameHeight / 2 - mn, 15), min(gameHeight / 2 + mn, gameHeight - 15));
+    isOutside = curX != pos.x || curY != pos.y;
   }
 }
 
@@ -406,32 +408,9 @@ class bubble {
     vel.sub(adv.div(bubbles.size()).sub(loc).normalize().div(125));
 
     float adjSize = size / 2;
-    if(loc.x > width  + adjSize) { loc.x = -adjSize; } else if(loc.x < -adjSize) { loc.x = width  + adjSize; }
-    if(loc.y > height + adjSize) { loc.y = -adjSize; } else if(loc.y < -adjSize) { loc.y = height + adjSize; }
+    if(loc.x > gameWidth  + adjSize) { loc.x = -adjSize; } else if(loc.x < -adjSize) { loc.x = gameWidth  + adjSize; }
+    if(loc.y > gameHeight + adjSize) { loc.y = -adjSize; } else if(loc.y < -adjSize) { loc.y = gameHeight + adjSize; }
   }
-  // void draw(PGraphics base) {
-    // Sparkyjohn's failed contribution. Still here for reference if desired.
-    // Texure filterTexture = new Texture(effect, effect.texture.width, effect.texture.height, effect.texture.getParameters());
-    // filterTexture.invertedY(true);
-    // PImage filterImage = new PImage();
-    // filterImage.parent = parent;
-    // filterImage.width = filterImage.pixelWidth = effect.texture.width;
-    // filterImage.height = filterImage.pixelHeight = effect.texture.height;
-    // filterImage.format = ARGB;
-    // effect.setCache(filterImage, effect.texture);
-
-    // effect.beginDraw();
-    // effect.beginShape(QUADS);
-    // effect.texture(filterImage);
-    // effect.fill(255, 0, 0);
-    // effect.vertex(0, 0, 0, 0);
-    // effect.vertex(effect.width, 0, 1, 0);
-    // effect.vertex(effect.width, effect.height, 1, 1);
-    // effect.vertex(0, effect.height, 0, 1);
-    // effect.endShape();
-    // effect.endDraw();
-    // End sparkyjohn's contrib.
-  // }
 }
 
 PGraphics bubbleLayer;
@@ -441,7 +420,7 @@ void drawBubbles(PGraphics base) {
   FloatList timeOff = new FloatList();
   float currentTime = adjMillis() / 1000.0;
   for(bubble b : bubbles) {
-    coord_x.append(b.loc.x / width);
+    coord_x.append(b.loc.x / gameWidth);
     coord_y.append(1 - b.loc.y / height);
     timeOff.append(currentTime + b.timer_offset);
   }
@@ -451,9 +430,7 @@ void drawBubbles(PGraphics base) {
   bubbleShader.set("coord_x", coord_x.array());
   bubbleShader.set("coord_y", coord_y.array());
   bubbleShader.set("timeOff", timeOff.array());
-  bubbleLayer.filter(bubbleShader);
-  base.imageMode(CORNER);
-  base.image(bubbleLayer, 0, 0);
+  bubbleLayer.filter(bubbleShader); //WHAT
 }
 
 class arrow {
@@ -541,10 +518,10 @@ class obj {
   }
   
   boolean onScreen() {
-    return (loc.x > -10 && loc.x < width + 10 && loc.y > -10 && loc.y < height + 10);
+    return (loc.x > -10 && loc.x < gameWidth + 10 && loc.y > -10 && loc.y < gameHeight + 10);
   }
   boolean inBox() {
-    return (loc.x > width / 2 - (f.size / 2) - 2 && loc.x < width / 2 + (f.size / 2) + 2 && loc.y > height / 2 - (f.size / 2) - 2 && loc.y < height / 2 + (f.size / 2) + 2);
+    return (loc.x > gameWidth / 2 - (f.size / 2) - 2 && loc.x < gameWidth / 2 + (f.size / 2) + 2 && loc.y > gameHeight / 2 - (f.size / 2) - 2 && loc.y < gameHeight / 2 + (f.size / 2) + 2);
   }
   void move() {
     float speed = int(c * 14.5) / 6.25 + 0.1;
@@ -622,13 +599,13 @@ void settings() {
 void setup() {
   frameRate(FPS);
   surface.setTitle("Aebal");
+  surface.setResizable(true);
 
   monitorOptions = new buttonMenu(165, 65, 200, 30, color(225), color(220), color(215), color(30), color(40), color(50));
   monitorOptions.addButton("1");
   monitorOptions.setState();
   monitorOptions.addButton("asdf");
   monitorOptions.addButton("yo mama");
-
 
 
   if(args != null && args.length > 0) {
@@ -666,8 +643,8 @@ void setup() {
   color setting_default_f_over = #FF0000;
   color setting_default_f_active = #FF9999;
 
-  volSlider        = new vol_slider       (width / 2, height / 1.175, 600, 35, 0             , -30 , 20, "Volume"    , #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
-  difficultySlider = new difficulty_slider(1357, height * 4/5, 500, 35, songComplexity, 0.75, 2 , "Difficulty", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
+  volSlider        = new vol_slider       (gameWidth / 2, gameHeight / 1.175, 600, 35, 0             , -30 , 20, "Volume"    , #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
+  difficultySlider = new difficulty_slider(1357, gameHeight * 4/5, 500, 35, songComplexity, 0.75, 2 , "Difficulty", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
   settings = new settingButton[] {
     DYNAMIC_BACKGROUND_COLOR = new settingButton(0, 0, 75, 75, 5, "Dynamic Background"  , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     DO_POST_PROCESSING       = new settingButton(0, 0, 75, 75, 5, "Color Shaders"       , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
@@ -685,11 +662,11 @@ void setup() {
   settings_right = new settingButton[] {DYNAMIC_BACKGROUND_COLOR, DO_POST_PROCESSING, BACKGROUND_BLOBS, SHOW_FPS, DEBUG_TIMINGS};
   for(int i = 0; i < settings_left.length; i++) {
     settings_left[i].x = 100;
-    settings_left[i].y = height / 1.65 - settings_left.length   * 50 + i * 100;
+    settings_left[i].y = gameHeight / 1.65 - settings_left.length   * 50 + i * 100;
   }
   for(int i = 0; i < settings_right.length; i++) {
-    settings_right[i].x = width - 100;
-    settings_right[i].y = height / 1.65 - settings_right.length * 50 + i * 100;
+    settings_right[i].x = gameWidth - 100;
+    settings_right[i].y = gameHeight / 1.65 - settings_right.length * 50 + i * 100;
   }
 
   settingsFileLoc = sketchPath("settings.json");
@@ -747,17 +724,17 @@ void setup() {
   gameSelect_songSelect_actual = songList.size() / 2;
   gameSelect_songSelect = gameSelect_songSelect_actual;
 
-  settings_button = new button(width - 65, height - 65, 85, 85, 5, image_gear, color(45), color(75), color(128));
-  back_button     = new button(65, height - 65, 85, 85, 5, image_back, color(45), color(75), color(128));
+  settings_button = new button(gameWidth - 65, gameHeight - 65, 85, 85, 5, image_gear, color(45), color(75), color(128));
+  back_button     = new button(65, gameHeight - 65, 85, 85, 5, image_back, color(45), color(75), color(128));
 
   defaultFont = createFont(sketchPath("assets/fonts/defaultFont.ttf"), 128);
   songFont    = createFont(sketchPath("assets/fonts/songFont.ttf"   ), 64 );
 
-  back  = createGraphics(width, height, P2D);
+  back  = createGraphics(gameWidth, gameHeight, P2D);
   strokeCap(PROJECT);
 
-  f = new field(max(width, height));
-  a = new arrow(width / 2, height / 2, 0, 500, 1700);
+  f = new field(max(gameWidth, gameHeight));
+  a = new arrow(gameWidth / 2, gameHeight / 2, 0, 500, 1700);
   chroma        = loadShader(sketchPath("assets/shaders/rgb_offset.glsl"   ));
   grayScale     = loadShader(sketchPath("assets/shaders/gray.glsl"         ));
   bubbleShader  = loadShader(sketchPath("assets/shaders/bubble.glsl"       ));
@@ -767,7 +744,7 @@ void setup() {
   chroma_g = vec2();
   chroma_b = vec2();
 
-  pos = vec2(width / 2, height / 2);
+  pos = vec2(gameWidth / 2, gameHeight / 2);
   previousPos = new PVector[1];
   for(int i = 0; i < previousPos.length; i++) {
     previousPos[i] = pos.copy();
@@ -783,8 +760,25 @@ void draw() {
     if(!paused) pause(true);
     return;
   }
-  previousCursor = activeCursor;
 
+  float scaleFactW = float(width)  / gameWidth ;
+  float scaleFactH = float(height) / gameHeight;
+  float scaleFact = min(scaleFactW, scaleFactH);
+
+  pushMatrix();
+  if(scaleFact == scaleFactH) {
+    float t = (width - gameWidth * scaleFact) / 2.0;
+    translate(t, 0);
+    curX = int(map(mouseX, t, (width + gameWidth * scaleFact) / 2.0, 0, gameWidth));
+    curY = int(map(mouseY, 0, height, 0, gameHeight));
+  }else{
+    float t = (height - gameHeight * scaleFact) / 2.0;
+    translate(0, t);
+    curX = int(map(mouseX, 0, width, 0, gameWidth));
+    curY = int(map(mouseY, t, (height + gameHeight * scaleFact) / 2.0, 0, gameHeight));
+  }
+  scale(scaleFact);
+  previousCursor = activeCursor;
   if(DEBUG_TIMINGS.state) {
     if(millis() > timerUpdateTime) {
       checkTimes = true;
@@ -801,14 +795,14 @@ void draw() {
       background(0);
       imageMode(CENTER);
       pushMatrix();
-      translate(width / 2, text_logo.height * (1 + 0.07 * sin(durationInto / 800.0)));
+      translate(gameWidth / 2, text_logo.height * (1 + 0.07 * sin(durationInto / 800.0)));
       rotate(sin(0.2 + durationInto / 500.0) / 40.0);
       image(text_logo, 0, 0);
       popMatrix();
       if(durationInto > 5000) {
         textFont(songFont, 48);
         textAlign(CENTER, CENTER);
-        text("<Press any key to begin>", width / 2, 0.8 * height);
+        text("<Press any key to begin>", gameWidth / 2, 0.8 * gameHeight);
       }
     } break;
     case "gameSelect": {
@@ -817,11 +811,11 @@ void draw() {
       stroke(128);
       strokeWeight(8);
       strokeCap(ROUND);
-      line(width / 2, height * 1/4, width / 2, height * 8 / 9);
+      line(gameWidth / 2, gameHeight * 1/4, gameWidth / 2, gameHeight * 8 / 9);
       strokeCap(PROJECT);
       imageMode(CENTER);
       noStroke();
-      image(text_logo, width / 2, text_logo.height / 2);
+      image(text_logo, gameWidth / 2, text_logo.height / 2);
       gameSelect_songSelect_actual = Math.floorMod(gameSelect_songSelect_actual, songList.size());
       gameSelect_songSelect = lerp(gameSelect_songSelect, gameSelect_songSelect_actual, 0.1);
 
@@ -849,12 +843,12 @@ void draw() {
           newlineCount = songTitle.length() - songTitle.replace("\n", "").length();
           offset_y_tmp = newlineCount * fontSize / 2.0;
           y_offset += offset_y_tmp;
-          text(songTitle, width / 2, 250 + y_offset);
+          text(songTitle, gameWidth / 2, 250 + y_offset);
           if(i == gameSelect_songSelect_actual) {
             float txtWid = textWidth(songTitle);
             float sw = txtWid / 2;
             float border_expand_y = 27.5 * (newlineCount + 1);
-            if(mouseX - tx > width / 2 - (60 + sw) && mouseX - tx < width / 2 + (60 + sw) && mouseY - ty > 250 + y_offset + 6.75 - border_expand_y && mouseY - ty < 250 + y_offset + 6.75 + border_expand_y) {
+            if(curX - tx > gameWidth / 2 - (60 + sw) && curX - tx < gameWidth / 2 + (60 + sw) && curY - ty > 250 + y_offset + 6.75 - border_expand_y && curY - ty < 250 + y_offset + 6.75 + border_expand_y) {
               mouseOverSong = true;
               if(mousePressed) {
                 fill(255, 128, 128);
@@ -868,13 +862,13 @@ void draw() {
               fill(255);
             }
             triangle(
-              width / 2 + sw + 15, 250 + y_offset + 6.75,
-              width / 2 + sw + 55, 250 + y_offset + 6.75 - 20,
-              width / 2 + sw + 55, 250 + y_offset + 6.75 + 20);
+              gameWidth / 2 + sw + 15, 250 + y_offset + 6.75,
+              gameWidth / 2 + sw + 55, 250 + y_offset + 6.75 - 20,
+              gameWidth / 2 + sw + 55, 250 + y_offset + 6.75 + 20);
             triangle(
-              width / 2 - sw - 15, 250 + y_offset + 6.75,
-              width / 2 - sw - 55, 250 + y_offset + 6.75 - 20,
-              width / 2 - sw - 55, 250 + y_offset + 6.75 + 20);
+              gameWidth / 2 - sw - 15, 250 + y_offset + 6.75,
+              gameWidth / 2 - sw - 55, 250 + y_offset + 6.75 - 20,
+              gameWidth / 2 - sw - 55, 250 + y_offset + 6.75 + 20);
             
             if(i != songList.size() - 1) {
               float descSize = 40;
@@ -899,8 +893,8 @@ void draw() {
                 detailsRight += '\n' + currentElement.duration;
               }
 
-              text(detailsLeft , width / 2 + descSize / 2 - tx, height * 1/4 + 3 - ty);
-              text(detailsRight, width / 2 + descSize / 2 + 10 * descSize - tx, height * 1/4 + 3 - ty);
+              text(detailsLeft , gameWidth / 2 + descSize / 2 - tx, gameHeight * 1/4 + 3 - ty);
+              text(detailsRight, gameWidth / 2 + descSize / 2 + 10 * descSize - tx, gameHeight * 1/4 + 3 - ty);
             }
           }
         }
@@ -933,9 +927,9 @@ void draw() {
         previousPos[i] = previousPos[i + 1];
       }
       previousPos[previousPos.length - 1] = pos.copy();
-      pos.set(mouseX, mouseY);
+      pos.set(curX, curY);
     
-      f.size = constrain(f.size - constrain(pow(15 * (c - 0.25), 3), -100, 25) * (60 / frameRate), 500, max(width, height));
+      f.size = constrain(f.size - constrain(pow(15 * (c - 0.25), 3), -100, 25) * (60 / frameRate), 500, max(gameWidth, gameHeight));
       f.update();
     
       intense = f.size <= 505;
@@ -944,9 +938,9 @@ void draw() {
         if (objSpawnTimer <= 0 && DO_ENEMY_SPAWNING) { //Object spawning
           float speed = random(5, 12) * (1 + 3.5 * c);
           
-          float v = min(height, f.size * 1.5) / 2;
-          PVector loc = random(0, 1) <= 0.15 ? pos.copy() : vec2(width / 2 + random(-v, v), height / 2 + random(-v, v));
-          float dis = 1.5 * sqrt(sq(width) + sq(height));
+          float v = min(gameHeight, f.size * 1.5) / 2;
+          PVector loc = random(0, 1) <= 0.15 ? pos.copy() : vec2(gameWidth / 2 + random(-v, v), gameHeight / 2 + random(-v, v));
+          float dis = 1.5 * sqrt(sq(gameWidth) + sq(gameHeight));
           float n = int(random(3, 3 + c * 4));
         
           float rng = random(c / 10, max(1, c * 2));
@@ -971,8 +965,8 @@ void draw() {
             case 0: { //Single
 
               loc = generateLoc(300);
-              float TLX = lerp(random(width  / 2 - f.size / 2, width  / 2 + f.size / 2), pos.x, random(0, 1));
-              float TLY = lerp(random(height / 2 - f.size / 2, height / 2 + f.size / 2), pos.y, random(0, 1));
+              float TLX = lerp(random(gameWidth  / 2 - f.size / 2, gameWidth  / 2 + f.size / 2), pos.x, random(0, 1));
+              float TLY = lerp(random(gameHeight / 2 - f.size / 2, gameHeight / 2 + f.size / 2), pos.y, random(0, 1));
               addEnemy(loc, PVector.fromAngle(atan2(TLY - loc.y, TLX - loc.x)).mult(speed));
             } break;
             case 1: { //star, circle, spiral
@@ -1055,7 +1049,7 @@ void draw() {
               int d = 1 + int(c * 5);
               float sz = random(250, 750 - c * 250);
               float objRot = random(0, TWO_PI);
-              loc.lerp(vec2(width / 2, height / 2), random(0, 1));
+              loc.lerp(vec2(gameWidth / 2, gameHeight / 2), random(0, 1));
               for(float i = 0; i < TWO_PI; i += TWO_PI / (n * d)) {
                 PVector objLoc = PVector.fromAngle(TWO_PI / n * floor(n * i / TWO_PI)).lerp(PVector.fromAngle(TWO_PI / n * ceil(n * i / TWO_PI)), (i * n / TWO_PI) % 1.0).rotate(objRot).mult(sz).add(loc);
                 PVector objVel = PVector.sub(loc, objLoc).setMag(1).rotate(HALF_PI);
@@ -1085,11 +1079,11 @@ void draw() {
         randTrans = DO_SHAKE.state ? vec2(s_random(10 * -c, 10 * c), s_random(10 * -c, 10 * c)) : vec2();
         ang += (0.001 + constrain(c / 75, 0, 0.05)) * (200 / frameRate);
         a.speed = constrain(a.speed * (1 + constrain((c - 0.25) / 100, -0.05, 0.05)), 0.5, 1.75);
-        float dfc = sqrt(sq(width) + sq(height));
+        float dfc = sqrt(sq(gameWidth) + sq(gameHeight));
         
-        a.x = cos(ang) * dfc + width / 2;
-        a.y = sin(ang) * dfc + height / 2;
-        a.a = atan2(a.y - height / 2, a.x - width / 2);
+        a.x = cos(ang) * dfc + gameWidth / 2;
+        a.y = sin(ang) * dfc + gameHeight / 2;
+        a.a = atan2(a.y - gameHeight / 2, a.x - gameWidth / 2);
         if(a.oT > 0) {
           a.update();
         }
@@ -1125,6 +1119,12 @@ void draw() {
         TT("Fade");
       }
 
+      if(BACKGROUND_BLOBS.state) {
+        TT("Blobs");
+        drawBubbles(back); //If you do this while back PGraphic is in "draw mode", the scaling gets messed up. Some processing related bug 
+        TT("Blobs");
+      }
+
       back.beginDraw();
       back.imageMode(CENTER);
       back.noStroke();
@@ -1133,11 +1133,9 @@ void draw() {
         back.background(backColor);
       }
       if(BACKGROUND_BLOBS.state) {
-        TT("Blobs");
-        drawBubbles(back);
-        TT("Blobs");
+        back.imageMode(CORNER);
+        back.image(bubbleLayer, 0, 0);
       }
-
       if(BACKGROUND_FADE.state) {
         back.fill(255);
         back.stroke(255);
@@ -1160,7 +1158,10 @@ void draw() {
       TT("Enemies");
       a.drawHead(back, 128);
       back.endDraw();
+
+      imageMode(CORNER);
       image(back, 0, 0);
+      
       a.drawLine();
       stroke(255);
       a.drawHead(g, 0);
@@ -1170,7 +1171,7 @@ void draw() {
       if(f.isOutside) {
         colorMode(RGB);
         fill(255, 0, 0);
-        rect(mouseX, mouseY, 10, 10);
+        rect(curX, curY, 10, 10);
       }
 
       pushMatrix(); {
@@ -1250,14 +1251,14 @@ void draw() {
       fill(255, 200);
       textFont(songFont, 48);
       textAlign(LEFT, BOTTOM);
-      text(songP.title, 10, height - 10);
+      text(songP.title, 10, gameHeight - 10);
       float durationComplete = ((float)song.sound.position()) / song.sound.length();
       rectMode(CORNERS);
       noStroke();
       fill(255);
-      rect(0, height - 4, width * durationComplete, height);
+      rect(0, gameHeight - 4, gameWidth * durationComplete, gameHeight);
       fill(64);
-      rect(width * durationComplete, height - 4, width, height);
+      rect(gameWidth * durationComplete, gameHeight - 4, gameWidth, gameHeight);
 
       textFont(defaultFont);
 
@@ -1299,10 +1300,10 @@ void draw() {
       fadeBack(1, 255);
       fill(255);
       imageMode(CENTER);
-      image(image_paused, width / 2, 123, width / 2, width / 2 * (float(image_paused.height) / image_paused.width));
+      image(image_paused, gameWidth / 2, 123, gameWidth / 2, gameWidth / 2 * (float(image_paused.height) / image_paused.width));
       textFont(songFont, 48);
       textAlign(CENTER, CENTER);
-      text("<Press esc to return to game>", width / 2, height / 1.45);
+      text("<Press esc to return to game>", gameWidth / 2, gameHeight / 1.45);
       settings_button.draw();
       back_button.draw();
 
@@ -1314,7 +1315,7 @@ void draw() {
       fill(255);
       noStroke();
       imageMode(CENTER);
-      image(image_settings, width / 2, 123, width / 2, width / 2 * (float(image_settings.height) / image_settings.width));
+      image(image_settings, gameWidth / 2, 123, gameWidth / 2, gameWidth / 2 * (float(image_settings.height) / image_settings.width));
       
       textFont(defaultFont, 32);
       textAlign(LEFT, CENTER);
@@ -1341,7 +1342,7 @@ void draw() {
       fill(255);
       textFont(songFont, 60);
       textAlign(CENTER, CENTER);
-      text("Loading...", width / 2, height / 2);
+      text("Loading...", gameWidth / 2, gameHeight / 2);
     } break;
     case "levelSummary": {
       int adjustedScoreDuration    = min(1500, 100 * score   );
@@ -1373,19 +1374,19 @@ void draw() {
       textAlign(CENTER, CENTER);
       textFont(songFont, 72);
       fill(255);
-      text(songP.title, width / 2, height / 4.5);
+      text(songP.title, gameWidth / 2, gameHeight / 4.5);
       textAlign(LEFT, CENTER);
       float titleWidth = textWidth(songP.title) / 2;
       textFont(songFont, 40);
       float calculatedScore = float(score) / (1 + sqrt(float(hitCount))) * pow(1.4 * (songComplexity), 3);
-      text("Score:\t\t " + adjustedScore + "\nHit Count:\t\t " + adjustedHitCount+"\nGrade:\t\t " + calculatedScore, width / 2 - titleWidth, height / 2.33);
+      text("Score:\t\t " + adjustedScore + "\nHit Count:\t\t " + adjustedHitCount+"\nGrade:\t\t " + calculatedScore, gameWidth / 2 - titleWidth, gameHeight / 2.33);
 
       if(durationInto > 500) songEndScreenSkippable = true;
 
       if(durationInto > hitCountEnd + 1000) {
         textFont(songFont, 48);
         textAlign(CENTER, CENTER);
-        text("<Press any key to continue>", width / 2, height / 1.4);
+        text("<Press any key to continue>", gameWidth / 2, gameHeight / 1.4);
       }
 
     } break;
@@ -1396,7 +1397,7 @@ void draw() {
       fill(0, clampMap(durationInto, 0, fadeDuration, fadeOpacityStart, fadeOpacityEnd));
       noStroke();
       rectMode(CORNER);
-      rect(-5, -5, width + 10, height + 10);
+      rect(-5, -5, gameWidth + 10, gameHeight + 10);
     }
   }
 
@@ -1413,15 +1414,15 @@ void draw() {
 
     float adjTextHeight = textFontSize + textPaddingVertical;
     float rectHeight = timingDisplay.size() * adjTextHeight + textPaddingVertical * 3;
-    rect(width - rectWidth - rightPadding, topPadding, rectWidth, rectHeight);
+    rect(gameWidth - rectWidth - rightPadding, topPadding, rectWidth, rectHeight);
     textFont(defaultFont, textFontSize);
     fill(255);
     int i = 0;
     for(Map.Entry<String, String> entry : timingDisplay.entrySet()) {
       textAlign(LEFT, TOP);
-      text(entry.getKey()  , width - rightPadding + textPaddingSides - rectWidth, textPaddingVertical + topPadding + i * adjTextHeight);
+      text(entry.getKey()  , gameWidth - rightPadding + textPaddingSides - rectWidth, textPaddingVertical + topPadding + i * adjTextHeight);
       textAlign(RIGHT, TOP); 
-      text(entry.getValue(), width - rightPadding - textPaddingSides            , textPaddingVertical + topPadding + i * adjTextHeight);
+      text(entry.getValue(), gameWidth - rightPadding - textPaddingSides            , textPaddingVertical + topPadding + i * adjTextHeight);
       i++;
     }
   }
@@ -1429,14 +1430,14 @@ void draw() {
     rectMode(CORNER);
     noStroke();
     fill(25, 128);
-    rect(width - 72, 2, 70, 35, 3);
+    rect(gameWidth - 72, 2, 70, 35, 3);
     fill(255);
     textAlign(LEFT, BOTTOM);
     textSize(15);
     textLeading(15);
     gameFrameCount++;
     gameFrameRateTotal += frameRate;
-    text("FPS: " + nf(min(999, round(fps_tracker)), 3) + "\nAdv: " + nf(min(999, round(gameFrameRateTotal / gameFrameCount)), 3), width - 70, 35);
+    text("FPS: " + nf(min(999, round(fps_tracker)), 3) + "\nAdv: " + nf(min(999, round(gameFrameRateTotal / gameFrameCount)), 3), gameWidth - 70, 35);
     fps_tracker = lerp(fps_tracker, frameRate, 1 / frameRate);
   }
 
@@ -1449,6 +1450,8 @@ void draw() {
   }
 
   if(timerUpdateTime == -1) timerUpdateTime = millis() + TIMER_UPDATE_FREQUENCY;
+
+  popMatrix();
 }
 
 void exit() {
