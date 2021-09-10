@@ -235,7 +235,7 @@ class difficulty_slider extends slider {
         super(x, y, w, h, val, val_min, val_max, txt , clr, clr, clr_hover, clr_hover, clr_hover, clr_active);
     }
     void onChange() {
-        val = float(nf(val, 0, 2));
+        val = float(nf(val, 0, 2).replace(",", "."));
         songComplexity = val;
         float n = getNormVal();
         color newCol = lerpColors(n, #00FF00, #2222FF, #FF0000);
