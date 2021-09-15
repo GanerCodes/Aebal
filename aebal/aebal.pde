@@ -16,7 +16,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 
-boolean REFRESH_SONG_METADATA = true; //Recheck song metadata, even if found in cache
+boolean REFRESH_SONG_METADATA = false; //Recheck song metadata, even if found in cache
 boolean DO_ENEMY_SPAWNING     = true;
 float TIMER_UPDATE_FREQUENCY = 500; //Debug timer update rate (millis)
 float BACKGROUND_COLOR_FADE = 0.275; //Lerp value
@@ -26,6 +26,21 @@ int GAMESELECT_SONGDISPLAYCOUNT = 10; //How many songs in the Song Selector to d
 int MAX_SIMULTANEOUS_DAMAGE = 100; //Mono got mad at the circles
 int gameWidth = 1920, gameHeight = 1080; //xdd
 
+String[] locSpawns = new String[] {
+    "cos(t)/(abs(sin(t)+abs(cos(t)))+abs(cos(t)))|sin(t)/(abs(sin(t)+abs(cos(t)))+abs(cos(t)))",
+    "cos(t)/max(abs(cos(t)),abs(sin(t)))|sin(t)/max(abs(cos(t)),abs(sin(t)))",
+    "1/6*16*pow(sin(t),3)|1/6*(13*cos(t)-5*cos(2*t)-2*cos(3*t)-cos(4*t))",
+    "cos(t)|sin(t)"
+};
+String[] velSpawns = new String[] {
+    "x+y|y*x",
+    "x|y|3",
+    "1|y",
+    "x|1",
+    "2.5|0",
+    "cos(x*y)|0",
+    "cos((x-y)/2)|sin(y)"
+};
 boolean intense, allowDebugActions, cancerMode, keydown_SHIFT, checkTimes, textSFXPlaying, songEndScreenSkippable, mouseOverSong, paused, show_fade_in = true;
 int curX, curY, monitorID, cancerCount, score, hitCount, gameFrameCount, durationInto, song_intensity_count, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1, nextVolumeSFXplay = -1;
 float gameFrameRateTotal, scrollWait, fps_tracker, gameSelect_songSelect, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, song_total_intensity, millisDelta, fadeDuration = 5000, fadeOpacityStart = 400, fadeOpacityEnd = 0, grayScaleTimer = 100;
@@ -47,6 +62,8 @@ ArrayList<obj> objs = new ArrayList();
 ArrayList<bubble> bubbles = new ArrayList();
 ArrayList<songElement> songList = new ArrayList();
 ArrayList<floatingText> floatingPrompts = new ArrayList();
+ArrayList<expressionLocPair> locExpressions = new ArrayList();
+ArrayList<expressionLocPair> velExpressions = new ArrayList();
 HashMap<String, Long> timingList;
 HashMap<String, String> timingDisplay;
 field f;
@@ -87,15 +104,25 @@ int getOnScreenObjCount() {
   return i;
 }
 
-boolean lineIntersection(PVector a, PVector b, PVector c, PVector d) {
+boolean lineIntersection(PVector a, PVector b, PVector c, PVector d) { //Yea, I wrote this, not to flex or anything 😎
   return (b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x)>=0?(d.x-c.x)*(b.y-c.y)-(d.y-c.y)*(b.x-c.x)>=0&&(b.x-a.x)*(d.y-a.y)-(b.y-a.y)*(d.x-a.x)<=0&&(d.x-c.x)*(a.y-c.y)-(d.y-c.y)*(a.x-c.x)<=0:(d.x-c.x)*(b.y-c.y)-(d.y-c.y)*(b.x-c.x)<=0&&(b.x-a.x)*(d.y-a.y)-(b.y-a.y)*(d.x-a.x)>=0&&(d.x-c.x)*(a.y-c.y)-(d.y-c.y)*(a.x-c.x)>=0;
 }
-
-boolean rectIntersection(PVector loc, float s, PVector a, PVector b) {
-  return lineIntersection(vec2(loc.x - s / 2, loc.y - s / 2), vec2(loc.x + s / 2, loc.y - s / 2), a, b) || 
+boolean inBounds(PVector loc, PVector boxLoc, PVector boxSize) {
+    return loc.x >= boxLoc.x && loc.x <= boxLoc.x + boxSize.x && loc.y >= boxLoc.y && loc.y <= boxLoc.y + boxSize.y;
+}
+boolean squareIntersection(PVector loc, float s, PVector a, PVector b) { //This is center aligned, for some reason
+  return
+  lineIntersection(vec2(loc.x - s / 2, loc.y - s / 2), vec2(loc.x + s / 2, loc.y - s / 2), a, b) || 
   lineIntersection(vec2(loc.x + s / 2, loc.y - s / 2), vec2(loc.x + s / 2, loc.y + s / 2), a, b) || 
   lineIntersection(vec2(loc.x + s / 2, loc.y + s / 2), vec2(loc.x - s / 2, loc.y + s / 2), a, b) || 
   lineIntersection(vec2(loc.x - s / 2, loc.y + s / 2), vec2(loc.x - s / 2, loc.y - s / 2), a, b);
+}
+boolean rectIntersection(PVector loc, PVector s, PVector a, PVector b) { //Corner aligned as it should be
+  return
+  lineIntersection(new PVector(loc.x      , loc.y      ), new PVector(loc.x + s.x, loc.y      ), a, b) || 
+  lineIntersection(new PVector(loc.x + s.x, loc.y      ), new PVector(loc.x + s.x, loc.y + s.y), a, b) || 
+  lineIntersection(new PVector(loc.x + s.x, loc.y + s.y), new PVector(loc.x      , loc.y + s.y), a, b) || 
+  lineIntersection(new PVector(loc.x      , loc.y + s.y), new PVector(loc.x      , loc.y      ), a, b);
 }
 
 void moveSongSel(int a) {
@@ -351,7 +378,7 @@ class songElement {
       songCacheDir.setJSONObject(title, songData);
     }else{
       JSONObject songMeta = songCacheDir.getJSONObject(title);
-      if(!songMeta.isNull("author")) this.author = songMeta.getString("author");
+      if(!songMeta.isNull("author"  )) this.author   = songMeta.getString("author"  );
       if(!songMeta.isNull("duration")) this.duration = songMeta.getString("duration");
     }
   }
@@ -460,10 +487,10 @@ class arrow {
     d1 = -mn - (sz) * (cos(rot) + 1);
     PVector org = vec2(x + cos(a) * d1, y + sin(a) * d1);
     if(oT > 120 && (
-      rectIntersection(pos, 20, org, PVector.add(org, PVector.fromAngle(a + FIFTH_PI).mult(30))) || 
-      rectIntersection(pos, 20, org, PVector.add(org, PVector.fromAngle(a - FIFTH_PI).mult(30))) ||
+      squareIntersection(pos, 20, org, PVector.add(org, PVector.fromAngle(a + FIFTH_PI).mult(30))) || 
+      squareIntersection(pos, 20, org, PVector.add(org, PVector.fromAngle(a - FIFTH_PI).mult(30))) ||
       (cancerMode && (
-        rectIntersection(pos, 22.5, org, vec2(x + cos(a) * d2, y + sin(a) * d2)) ||
+        squareIntersection(pos, 22.5, org, vec2(x + cos(a) * d2, y + sin(a) * d2)) ||
         lineIntersection(org, vec2(x + cos(a) * d2, y + sin(a) * d2), previousPos[previousPos.length - 1], pos)
       ))
     )) {
@@ -527,7 +554,7 @@ class obj {
     float speed = int(c * 14.5) / 6.25 + 0.1;
 
     ploc = loc.copy();
-    loc.add(vel.copy().mult(speed * (60 / frameRate)));
+    loc.add(PVector.mult(vel, speed * (60 / frameRate)));
     if (timer == 3) {
       score++;
       timer = 0;
@@ -662,6 +689,17 @@ void setup() {
     settings_right[i].y = gameHeight / 1.65 - settings_right.length * 50 + i * 100;
   }
 
+  locExpressions = new ArrayList();
+  velExpressions = new ArrayList();
+  for(String s : locSpawns) {
+      String[] spl = split(s, "|");
+      addLocExpression(locExpressions, spl[0], spl[1]);    
+  }
+  for(String s : velSpawns) {
+      String[] spl = split(s, "|");
+      addVelExpression(velExpressions, spl[0], spl[1], spl.length > 2 ? float(spl[2]) : 1);
+  }   
+
   settingsFileLoc = sketchPath("settings.json");
   songDataFileLoc = sketchPath("songData.json");
   try {
@@ -686,7 +724,6 @@ void setup() {
     menuSettings.setInt("monitorID", 1);
     saveJSONObject(menuSettings, settingsFileLoc);
   }
-
 
   image_back     = loadImage(sketchPath("assets/Images/backarrow.png" ));
   text_logo      = loadImage(sketchPath("assets/Images/aebal_text.png"));
@@ -939,18 +976,21 @@ void draw() {
           float rng = random(c / 10, max(1, c * 2));
           if(cancerMode) rng = min(1, rng * 2.5);
           int SPAWN_PATTERN = 0;
+
           if(random(0, 1) < min(0.15, (c - 0.25))) {
             objSpawnTimer = max(objSpawnTimer, 0) + c * 15;
             if(rng < 0.3) {
               SPAWN_PATTERN = 1;
-            }else if(rng < 0.5) {
+            }else if(rng < 0.4) {
               SPAWN_PATTERN = 2;
-            }else if(rng < 0.7) {
+            }else if(rng < 0.5) {
               SPAWN_PATTERN = 3;
-            }else if(rng < 0.875) {
+            }else if(rng < 0.6) {
               SPAWN_PATTERN = 4;
-            }else{
+            }else if(rng < 0.75){
               SPAWN_PATTERN = 5;
+            }else{
+              SPAWN_PATTERN = 6;
             }
           }
 
@@ -1052,6 +1092,10 @@ void draw() {
                 ));
               }
             } break;
+            case 6: {
+              objs.addAll(getRandomGroup(locExpressions, velExpressions, int(c * 50), max(1, c + 0.25), max(0.2, 2 - c)));
+              objSpawnTimer += 30;
+            } break;
           }
           objSpawnTimer = max(objSpawnTimer, 0) + (30 - c * 10);
         }
@@ -1098,9 +1142,10 @@ void draw() {
       if(DYNAMIC_BACKGROUND_COLOR.state) {
         colorMode(HSB);
         color updatedColor;
-        updatedColor = intense ? color((100 + (c * 500)) % 255, 255, (c - 0.25) * 200) : color((c * 200) % 255);
+        float adjC = min(c, 1.2);
+        updatedColor = intense ? color((100 + (c * 500)) % 255, 255, (adjC / 1.2 - 0.25) * 200) : color((c * 200) % 255);
         backColor = lerpColor(backColor, updatedColor, BACKGROUND_COLOR_FADE);
-        background(hue(backColor), saturation(backColor), brightness(backColor) / 3.1);
+        background(hue(backColor), saturation(backColor), brightness(backColor) / 3);
         colorMode(RGB);
       }else{
         background(0);
@@ -1177,9 +1222,9 @@ void draw() {
       //post processing
       if(DO_POST_PROCESSING.state) {
         TT("PostProcessing");
-        bloom.set("bloom_intensity", 2.0 * c / 81.0);
+        bloom.set("bloom_intensity", 1.5 * c / 81.0);
         if(intense) {
-          bloom.set("saturation", 1 + c / 3.33);
+          bloom.set("saturation", 1 + c / 5.0);
         }else{
           bloom.set("saturation", 1.0);
         }
@@ -1534,6 +1579,8 @@ void keyPressed(KeyEvent e) {
             default: {
               if(key == ' ') {
                 song.sound.skip(30 * 1000);
+              }else if(key == 'i') {
+                NO_DAMAGE.state = !NO_DAMAGE.state;
               }
             } break;
           }
