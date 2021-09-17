@@ -26,28 +26,12 @@ int GAMESELECT_SONGDISPLAYCOUNT = 10; //How many songs in the Song Selector to d
 int MAX_SIMULTANEOUS_DAMAGE = 100; //Mono got mad at the circles
 int gameWidth = 1920, gameHeight = 1080; //xdd
 
-String[] locSpawns = new String[] {
-    "cos(t)/(abs(sin(t)+abs(cos(t)))+abs(cos(t)))|sin(t)/(abs(sin(t)+abs(cos(t)))+abs(cos(t)))",
-    "cos(t)/max(abs(cos(t)),abs(sin(t)))|sin(t)/max(abs(cos(t)),abs(sin(t)))",
-    "1/6*16*pow(sin(t),3)|1/6*(13*cos(t)-5*cos(2*t)-2*cos(3*t)-cos(4*t))",
-    "cos(t)|sin(t)"
-};
-String[] velSpawns = new String[] {
-    "x+y|y*x",
-    "x|y|3",
-    "1|y",
-    "x|1",
-    "2.5|0",
-    "cos(x*y)|0",
-    "cos((x-y)/2)|sin(y)"
-};
 boolean intense, allowDebugActions, cancerMode, keydown_SHIFT, checkTimes, textSFXPlaying, songEndScreenSkippable, mouseOverSong, paused, show_fade_in = true;
 int curX, curY, monitorID, cancerCount, score, hitCount, gameFrameCount, durationInto, song_intensity_count, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1, nextVolumeSFXplay = -1;
-float gameFrameRateTotal, scrollWait, fps_tracker, gameSelect_songSelect, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, song_total_intensity, millisDelta, fadeDuration = 5000, fadeOpacityStart = 400, fadeOpacityEnd = 0, grayScaleTimer = 100;
+float gameFrameRateTotal, scrollWait, fps_tracker, gameSelect_songSelect, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, song_total_intensity, millisDelta, fadeDuration = 5000, fadeOpacityStart = 400, fadeOpacityEnd = 0, grayScaleTimer = 100, trailingAngle = 0, trailStrokeWeight = 4.5;
 String settingsFileLoc, songDataFileLoc, previousScene, gameState = "title";
 int[] cancerKeys = {UP, UP, DOWN, DOWN, LEFT, RIGHT, LEFT, RIGHT, 66, 65, ENTER};
-PVector pos, randTrans, chroma_r, chroma_g, chroma_b;
-PVector[] previousPos;
+PVector pos, previousPos, randTrans, prevTrailLoc, trailLoc, chroma_r, chroma_g, chroma_b;
 Sound song, hitSound, buttonSFX, textSFX, volChangeSFX, songSelChange, gainScore;
 Sound[] soundList;
 Minim minim;
@@ -69,7 +53,7 @@ HashMap<String, String> timingDisplay;
 field f;
 arrow a;
 settingButton[] settings, settings_left, settings_right;
-settingButton DEBUG_TIMINGS, DYNAMIC_BACKGROUND_COLOR, DO_POST_PROCESSING, BACKGROUND_BLOBS, BACKGROUND_FADE, DO_HIT_PROMPTS, NO_DAMAGE, RGB_ENEMIES, DO_CHROMA, DO_SHAKE, SHOW_FPS;
+settingButton DEBUG_TIMINGS, DYNAMIC_BACKGROUND_COLOR, DO_POST_PROCESSING, DO_FANCY_TRAILS, BACKGROUND_BLOBS, BACKGROUND_FADE, DO_HIT_PROMPTS, NO_DAMAGE, RGB_ENEMIES, DO_CHROMA, DO_SHAKE, SHOW_FPS;
 button settings_button, back_button;
 buttonMenu monitorOptions;
 vol_slider volSlider;
@@ -404,10 +388,15 @@ class field {
     stroke(255);
     rect(gameWidth / 2, gameHeight / 2, min(size, gameWidth - 5), min(size, gameHeight - 5));
   }
-  void update() {
+  void constrainPosition(PVector pos) {
     float mn = size / 2 - 10 - 5;
-    pos.x = constrain(curX, max(gameWidth  / 2 - mn, 15), min(gameWidth  / 2 + mn, gameWidth  - 15));
-    pos.y = constrain(curY, max(gameHeight / 2 - mn, 15), min(gameHeight / 2 + mn, gameHeight - 15));
+    pos.set(
+      constrain(pos.x, max(gameWidth  / 2 - mn, 15), min(gameWidth  / 2 + mn, gameWidth  - 15)),
+      constrain(pos.y, max(gameHeight / 2 - mn, 15), min(gameHeight / 2 + mn, gameHeight - 15))
+    );
+  }
+  void update() {
+    constrainPosition(pos);
     isOutside = curX != pos.x || curY != pos.y;
   }
 }
@@ -491,7 +480,7 @@ class arrow {
       squareIntersection(pos, 20, org, PVector.add(org, PVector.fromAngle(a - FIFTH_PI).mult(30))) ||
       (cancerMode && (
         squareIntersection(pos, 22.5, org, vec2(x + cos(a) * d2, y + sin(a) * d2)) ||
-        lineIntersection(org, vec2(x + cos(a) * d2, y + sin(a) * d2), previousPos[previousPos.length - 1], pos)
+        lineIntersection(org, vec2(x + cos(a) * d2, y + sin(a) * d2), previousPos, pos)
       ))
     )) {
       if(noScoreTimer <= 0) {
@@ -669,6 +658,7 @@ void setup() {
     DYNAMIC_BACKGROUND_COLOR = new settingButton(0, 0, 75, 75, 5, "Dynamic Background"  , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     DO_POST_PROCESSING       = new settingButton(0, 0, 75, 75, 5, "Color Shaders"       , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     BACKGROUND_BLOBS         = new settingButton(0, 0, 75, 75, 5, "Background Blobs"    , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
+    DO_FANCY_TRAILS          = new settingButton(0, 0, 75, 75, 5, "Fancy Trails"        , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     BACKGROUND_FADE          = new settingButton(0, 0, 75, 75, 5, "Background Fade"     , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     DO_HIT_PROMPTS           = new settingButton(0, 0, 75, 75, 5, "Score Ticks"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     DEBUG_TIMINGS            = new settingButton(0, 0, 75, 75, 5, "Timing Info"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
@@ -679,7 +669,7 @@ void setup() {
     SHOW_FPS                 = new settingButton(0, 0, 75, 75, 5, "FPS Tracker"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active)
   };
   settings_left  = new settingButton[] {RGB_ENEMIES, DO_CHROMA, DO_SHAKE, BACKGROUND_FADE, DO_HIT_PROMPTS};
-  settings_right = new settingButton[] {DYNAMIC_BACKGROUND_COLOR, DO_POST_PROCESSING, BACKGROUND_BLOBS, SHOW_FPS, DEBUG_TIMINGS};
+  settings_right = new settingButton[] {DYNAMIC_BACKGROUND_COLOR, DO_POST_PROCESSING, BACKGROUND_BLOBS, DO_FANCY_TRAILS, SHOW_FPS, DEBUG_TIMINGS};
   for(int i = 0; i < settings_left.length; i++) {
     settings_left[i].x = 100;
     settings_left[i].y = gameHeight / 1.65 - settings_left.length   * 50 + i * 100;
@@ -689,16 +679,25 @@ void setup() {
     settings_right[i].y = gameHeight / 1.65 - settings_right.length * 50 + i * 100;
   }
 
+
   locExpressions = new ArrayList();
   velExpressions = new ArrayList();
-  for(String s : locSpawns) {
-      String[] spl = split(s, "|");
-      addLocExpression(locExpressions, spl[0], spl[1]);    
+  String[] patternFile = loadStrings("patterns.txt");
+  for(String s : patternFile) {
+    s = trim(split(s, "#")[0]);
+    if(s.length() < 3 || s.charAt(0) == '#') continue;
+    String[] spl = split(s.substring(2), "|");
+    for(int i = 0; i < spl.length; i++) {
+      spl[i] = trim(spl[i]);
+    }
+    boolean isParametric = s.substring(0, 2).equals("L:");
+    addExpression(isParametric ? locExpressions : velExpressions, spl[0], spl[1], 
+      spl.length > 2 && spl[2].length() > 0 ? float(spl[2]) : 1, 
+      spl.length > 3 && spl[3].length() > 0 ? float(spl[3]) : 1, 
+      spl.length > 4 && spl[4].length() > 0 ? float(spl[4]) : 1, 
+      isParametric ? 'p' : 'i'
+    );
   }
-  for(String s : velSpawns) {
-      String[] spl = split(s, "|");
-      addVelExpression(velExpressions, spl[0], spl[1], spl.length > 2 ? float(spl[2]) : 1);
-  }   
 
   settingsFileLoc = sketchPath("settings.json");
   songDataFileLoc = sketchPath("songData.json");
@@ -775,10 +774,9 @@ void setup() {
   chroma_b = vec2();
 
   pos = vec2(gameWidth / 2, gameHeight / 2);
-  previousPos = new PVector[1];
-  for(int i = 0; i < previousPos.length; i++) {
-    previousPos[i] = pos.copy();
-  }
+  previousPos  = pos.copy();
+  prevTrailLoc = pos.copy();
+  trailLoc     = pos.copy();
 
   updateMonitorOptions();
 }
@@ -953,10 +951,7 @@ void draw() {
       noScoreTimer -= (60 / frameRate);
       objSpawnTimer -= c * 2 * (60 / frameRate);
 
-      for(int i = 0; i < previousPos.length - 1; i++) {
-        previousPos[i] = previousPos[i + 1];
-      }
-      previousPos[previousPos.length - 1] = pos.copy();
+      previousPos.set(pos.x, pos.y);
       pos.set(curX, curY);
     
       f.size = constrain(f.size - constrain(pow(15 * (c - 0.25), 3), -100, 25) * (60 / frameRate), 500, max(gameWidth, gameHeight));
@@ -1093,8 +1088,8 @@ void draw() {
               }
             } break;
             case 6: {
-              objs.addAll(getRandomGroup(locExpressions, velExpressions, int(c * 50), max(1, c + 0.25), max(0.2, 2 - c)));
-              objSpawnTimer += 30;
+              objs.addAll(getRandomGroup(locExpressions, velExpressions, max(50, int(c * 30)), max(1, c + 0.25), max(0.2, 2 - c)));
+              objSpawnTimer += 60;
             } break;
           }
           objSpawnTimer = max(objSpawnTimer, 0) + (30 - c * 10);
@@ -1175,10 +1170,43 @@ void draw() {
         back.image(bubbleLayer, 0, 0);
       }
       if(BACKGROUND_FADE.state) {
-        back.fill(255);
         back.stroke(255);
-        back.strokeWeight(5);
-        back.line(previousPos[previousPos.length - 1].x, previousPos[previousPos.length - 1].y, pos.x, pos.y);
+        if(DO_FANCY_TRAILS.state) {
+          back.noFill();
+          if(dist(previousPos.x, previousPos.y, pos.x, pos.y) > 0) {
+            prevTrailLoc = trailLoc;
+            trailLoc = new PVector(pos.x, pos.y);
+
+            float d = dist(prevTrailLoc.x, prevTrailLoc.y, trailLoc.x, trailLoc.y);
+            d /= (2.25 + max(0, (60 - d) / 60));
+            float a = atan2(trailLoc.y - prevTrailLoc.y, trailLoc.x - prevTrailLoc.x);
+
+            PVector newMiddle   = PVector.add(prevTrailLoc, PVector.fromAngle(trailingAngle).mult(d));
+            PVector closeMargin = PVector.lerp(
+              PVector.lerp(
+                PVector.lerp(
+                  newMiddle, prevTrailLoc,
+                  min(1, 2 * pow(abs(trailingAngle - a), 2))
+                ),
+                trailLoc, 0.75
+              ),
+              newMiddle, 0.15
+            );
+            f.constrainPosition(newMiddle);
+            f.constrainPosition(closeMargin);
+            
+            trailingAngle = atan2(
+                bezierTangent(prevTrailLoc.y, newMiddle.y, closeMargin.y, trailLoc.y, 1),
+                bezierTangent(prevTrailLoc.x, newMiddle.x, closeMargin.x, trailLoc.x, 1)
+            );
+            trailStrokeWeight = lerp(trailStrokeWeight, constrain(d / 3.75, 4.5, 10), 10 / frameRate);
+            back.strokeWeight(trailStrokeWeight);
+            back.bezier(prevTrailLoc.x, prevTrailLoc.y, newMiddle.x, newMiddle.y, closeMargin.x, closeMargin.y, trailLoc.x, trailLoc.y);
+          }
+        }else{
+          back.strokeWeight(5);
+          back.line(previousPos.x, previousPos.y, pos.x, pos.y);
+        }
       }
       colorMode(HSB);
       globalObjColor = lerpColor(globalObjColor, (intense && RGB_ENEMIES.state) ? color((adjMillis() / 5.0) % 255, 164, 255) : color(0, 255, 255), 4.0 / frameRate);
@@ -1469,7 +1497,8 @@ void draw() {
     noStroke();
     fill(25, 128);
     rect(gameWidth - 72, 2, 70, 35, 3);
-    fill(255);
+    float warnIntensity = clampMap(fps_tracker, 0, 120, 0, 255);
+    fill(255, warnIntensity, warnIntensity);
     textAlign(LEFT, BOTTOM);
     textSize(15);
     textLeading(15);
