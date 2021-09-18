@@ -7,6 +7,7 @@ import net.objecthunter.exp4j.operator.*;
 class expressionLocPair {
     Expression x, y;
     float countDiv = 1, speedDiv = 1, scaleDiv = 1;
+    String equation;
     expressionLocPair(Expression x, Expression y) {
         this.x = x;
         this.y = y;
@@ -42,6 +43,7 @@ void addExpression(ArrayList<expressionLocPair> exList, String eqX, String eqY, 
     );
     
     newExp.setDivs(speedDiv, countDiv, scaleDiv);
+    newExp.equation = "("+eqX+", "+eqY+")";
     exList.add(newExp);
 }
 PVector getLoc(expressionLocPair eq, float t) {
@@ -97,10 +99,11 @@ ArrayList<obj> getRandomGroup(ArrayList<expressionLocPair> locExpressions, Array
     float speedScaleFactor = speedProp * float(width) / (baseSize * speedDiv);
     float finalSize = random(200, 425) / (baseSize * sizeDiv);
 
+    expressionLocPair locExp = locExpressions.get((int)random(0, locExpressions.size()));
+    expressionLocPair velExp = velExpressions.get((int)random(0, velExpressions.size()));
+    logmsg(String.format("Parametric Spawn: [%s, %s]", locExp.equation, velExp.equation));
     return makeObjectGroup(
-        locExpressions.get((int)random(0, locExpressions.size())),
-        velExpressions.get((int)random(0, velExpressions.size())),
-        count, -10 / speedProp, 15 / speedProp, speedScaleFactor, finalSize, random(0, 1) < 0.5 ? random(-PI, PI) : 0, new PVector(gameWidth, gameHeight),
+        locExp, velExp, count, -10 / speedProp, 15 / speedProp, speedScaleFactor, finalSize, random(0, 1) < 0.5 ? random(-PI, PI) : (random(0, 1) < 0.5 ? 0 : PI), new PVector(gameWidth, gameHeight),
         new PVector(
             random(-1.0 / 6.5 * gameWidth , 1.0 / 6.5 * gameWidth ),
             random(-1.0 / 6.5 * gameHeight, 1.0 / 6.5 * gameHeight)

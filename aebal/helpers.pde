@@ -24,7 +24,7 @@ float sign(float x) {
     return x < 0 ? -1 : 1;
 }
 void TT(String ID) {
-    if(DEBUG_TIMINGS.state && checkTimes) {
+    if(DEBUG_INFO.state && checkTimes) {
         if(timingList.containsKey(ID)) {
             float t = (float)(System.nanoTime() - timingList.get(ID)) / 1000000000;
             String v = timerFormat.format(100 * t * frameRate)+"%     (" + timerFormat.format(t) + "s)";
