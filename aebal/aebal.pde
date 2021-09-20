@@ -54,7 +54,7 @@ field f;
 arrow a;
 debugList msgList;
 settingButton[] settings, settings_left, settings_right;
-settingButton DEBUG_INFO, TIMING_INFO, DYNAMIC_BACKGROUND_COLOR, DO_POST_PROCESSING, DO_FANCY_TRAILS, BACKGROUND_BLOBS, BACKGROUND_FADE, DO_HIT_PROMPTS, NO_DAMAGE, RGB_ENEMIES, DO_CHROMA, DO_SHAKE, SHOW_FPS;
+settingButton DEBUG_INFO, TIMING_INFO, DYNAMIC_BACKGROUND_COLOR, DO_POST_PROCESSING, DO_FANCY_TRAILS, BACKGROUND_BLOBS, BACKGROUND_FADE, SHOW_SONG_NAME, DO_HIT_PROMPTS, NO_DAMAGE, RGB_ENEMIES, DO_CHROMA, DO_SHAKE, SHOW_FPS;
 button settings_button, back_button;
 buttonMenu monitorOptions;
 vol_slider volSlider;
@@ -703,9 +703,10 @@ void setup() {
     BACKGROUND_BLOBS         = new settingButton(0, 0, 75, 75, 5, "Background Blobs"    , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     DO_FANCY_TRAILS          = new settingButton(0, 0, 75, 75, 5, "Fancy Trails"        , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     BACKGROUND_FADE          = new settingButton(0, 0, 75, 75, 5, "Background Fade"     , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
+    SHOW_SONG_NAME           = new settingButton(0, 0, 75, 75, 5, "Show Song Name"     , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     DO_HIT_PROMPTS           = new settingButton(0, 0, 75, 75, 5, "Score Ticks"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     DEBUG_INFO               = new settingButton(0, 0, 75, 75, 5, "Debug Info"          , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
-    TIMING_INFO              = new settingButton(0, 0, 75, 75, 5, "Timing Info"          , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
+    TIMING_INFO              = new settingButton(0, 0, 75, 75, 5, "Timing Info"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     RGB_ENEMIES              = new settingButton(0, 0, 75, 75, 5, "RGB Enemies"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     NO_DAMAGE                = new settingButton(0, 0, 75, 75, 5, "Invincible"          , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     DO_CHROMA                = new settingButton(0, 0, 75, 75, 5, "Chromatic Aberration", setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
@@ -713,7 +714,7 @@ void setup() {
     SHOW_FPS                 = new settingButton(0, 0, 75, 75, 5, "FPS Tracker"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active)
   };
   settings_left  = new settingButton[] {RGB_ENEMIES, DO_CHROMA, DYNAMIC_BACKGROUND_COLOR, DO_SHAKE, BACKGROUND_FADE, BACKGROUND_BLOBS};
-  settings_right = new settingButton[] {DO_POST_PROCESSING, DO_FANCY_TRAILS, DO_HIT_PROMPTS, SHOW_FPS, TIMING_INFO, DEBUG_INFO};
+  settings_right = new settingButton[] {DO_POST_PROCESSING, DO_FANCY_TRAILS, SHOW_SONG_NAME, DO_HIT_PROMPTS, SHOW_FPS, TIMING_INFO, DEBUG_INFO};
   for(int i = 0; i < settings_left.length; i++) {
     settings_left[i].x = 100;
     settings_left[i].y = gameHeight / 1.65 - settings_left.length   * 50 + i * 100;
@@ -1360,10 +1361,14 @@ void draw() {
       textAlign(LEFT, TOP);
       text("Score: " + score, 10, 0);
 
-      fill(255, 200);
-      textFont(songFont, 48);
-      textAlign(LEFT, BOTTOM);
-      text(songP.title, 10, gameHeight - 10);
+      
+      if(SHOW_SONG_NAME.state) {
+        fill(255, 200);
+        textFont(songFont, 48);
+        textAlign(LEFT, BOTTOM);
+        text(songP.title, 10, gameHeight - 10);
+      }
+      
       float durationComplete = ((float)song.sound.position()) / song.sound.length();
       rectMode(CORNERS);
       noStroke();
