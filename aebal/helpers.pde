@@ -23,18 +23,6 @@ float cNorm(float a, float b, float c) {
 float sign(float x) {
     return x < 0 ? -1 : 1;
 }
-void TT(String ID) {
-    if(DEBUG_INFO.state && checkTimes) {
-        if(timingList.containsKey(ID)) {
-            float t = (float)(System.nanoTime() - timingList.get(ID)) / 1000000000;
-            String v = timerFormat.format(100 * t * frameRate)+"%     (" + timerFormat.format(t) + "s)";
-            timingDisplay.put(ID, v);
-            timingList.remove(ID);
-        }else{
-            timingList.put(ID, System.nanoTime());
-        }
-    }
-}
 color mulColor(color c, PVector v) {
     return color(red(c) * v.x, green(c) * v.y, blue(c) * v.z);
 }

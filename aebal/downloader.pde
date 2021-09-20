@@ -65,7 +65,7 @@ asyncSubprocess tryDownloadFromClipboard() {
             String URL = (String) Toolkit.getDefaultToolkit().getSystemClipboard().getData(DataFlavor.stringFlavor);
             if(URL == null || URL.length() < 5) return null;
             logmsg(String.format("Downloading URL \"%s\"", URL));
-            p = subprocessAsync(new String[] {"youtube-dl", "--extract-audio", "--no-playlist", "--audio-format", "mp3", "--output", "%(title)s.%(ext)s", URL}, sketchPath("songs"));
+            p = subprocessAsync(new String[] {"youtube-dl", "--add-metadata", "--extract-audio", "--embed-thumbnail", "--no-playlist", "--audio-format", "mp3", "--output", "%(title)s.%(ext)s", URL}, sketchPath("songs"));
             return p;
         } catch(Throwable t) {
             return null;

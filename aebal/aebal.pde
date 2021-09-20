@@ -28,7 +28,7 @@ int gameWidth = 1920, gameHeight = 1080; //xdd
 
 boolean intense, allowDebugActions, cancerMode, keydown_SHIFT, checkTimes, textSFXPlaying, songEndScreenSkippable, mouseOverSong, paused, show_fade_in = true;
 int curX, curY, monitorID, cancerCount, score, hitCount, gameFrameCount, durationInto, song_intensity_count, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1, nextVolumeSFXplay = -1, delayedSceneTimer = -1;
-float gameFrameRateTotal, scrollWait, fps_tracker, gameSelect_songSelect, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, song_total_intensity, millisDelta, fadeDuration = 5000, fadeOpacityStart = 400, fadeOpacityEnd = 0, grayScaleTimer = 100, trailingAngle = 0, trailStrokeWeight = 4.5;
+float gameFrameRateTotal, scrollWait, fps_tracker, gameSelect_songSelect, gameSelectExtraYOffset, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, song_total_intensity, millisDelta, fadeDuration = 5000, fadeOpacityStart = 400, fadeOpacityEnd = 0, grayScaleTimer = 100, trailingAngle = 0, trailStrokeWeight = 4.5;
 String delayedSceneScene, settingsFileLoc, songDataFileLoc, previousScene, gameState = "title";
 int[] cancerKeys = {UP, UP, DOWN, DOWN, LEFT, RIGHT, LEFT, RIGHT, 66, 65, ENTER};
 PVector pos, previousPos, randTrans, prevTrailLoc, trailLoc, chroma_r, chroma_g, chroma_b;
@@ -54,7 +54,7 @@ field f;
 arrow a;
 debugList msgList;
 settingButton[] settings, settings_left, settings_right;
-settingButton DEBUG_INFO, DYNAMIC_BACKGROUND_COLOR, DO_POST_PROCESSING, DO_FANCY_TRAILS, BACKGROUND_BLOBS, BACKGROUND_FADE, DO_HIT_PROMPTS, NO_DAMAGE, RGB_ENEMIES, DO_CHROMA, DO_SHAKE, SHOW_FPS;
+settingButton DEBUG_INFO, TIMING_INFO, DYNAMIC_BACKGROUND_COLOR, DO_POST_PROCESSING, DO_FANCY_TRAILS, BACKGROUND_BLOBS, BACKGROUND_FADE, DO_HIT_PROMPTS, NO_DAMAGE, RGB_ENEMIES, DO_CHROMA, DO_SHAKE, SHOW_FPS;
 button settings_button, back_button;
 buttonMenu monitorOptions;
 vol_slider volSlider;
@@ -705,14 +705,15 @@ void setup() {
     BACKGROUND_FADE          = new settingButton(0, 0, 75, 75, 5, "Background Fade"     , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     DO_HIT_PROMPTS           = new settingButton(0, 0, 75, 75, 5, "Score Ticks"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     DEBUG_INFO               = new settingButton(0, 0, 75, 75, 5, "Debug Info"          , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
+    TIMING_INFO              = new settingButton(0, 0, 75, 75, 5, "Timing Info"          , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     RGB_ENEMIES              = new settingButton(0, 0, 75, 75, 5, "RGB Enemies"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     NO_DAMAGE                = new settingButton(0, 0, 75, 75, 5, "Invincible"          , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     DO_CHROMA                = new settingButton(0, 0, 75, 75, 5, "Chromatic Aberration", setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     DO_SHAKE                 = new settingButton(0, 0, 75, 75, 5, "Shake"               , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     SHOW_FPS                 = new settingButton(0, 0, 75, 75, 5, "FPS Tracker"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active)
   };
-  settings_left  = new settingButton[] {RGB_ENEMIES, DO_CHROMA, DO_SHAKE, BACKGROUND_FADE, DO_HIT_PROMPTS};
-  settings_right = new settingButton[] {DYNAMIC_BACKGROUND_COLOR, DO_POST_PROCESSING, BACKGROUND_BLOBS, DO_FANCY_TRAILS, SHOW_FPS, DEBUG_INFO};
+  settings_left  = new settingButton[] {RGB_ENEMIES, DO_CHROMA, DYNAMIC_BACKGROUND_COLOR, DO_SHAKE, BACKGROUND_FADE, BACKGROUND_BLOBS};
+  settings_right = new settingButton[] {DO_POST_PROCESSING, DO_FANCY_TRAILS, DO_HIT_PROMPTS, SHOW_FPS, TIMING_INFO, DEBUG_INFO};
   for(int i = 0; i < settings_left.length; i++) {
     settings_left[i].x = 100;
     settings_left[i].y = gameHeight / 1.65 - settings_left.length   * 50 + i * 100;
@@ -752,13 +753,16 @@ void setup() {
         b.state = menuSettings.getBoolean(b.txt);
       }
     }
-    if(!menuSettings.isNull("volume")) {
-      volSlider.val = menuSettings.getFloat("volume");
+    if(!menuSettings.isNull("volume")) volSlider.val = menuSettings.getFloat("volume");
+    if(!menuSettings.isNull("intensity")) {
+      difficultySlider.val = menuSettings.getFloat("intensity");
+      difficultySlider.onChange();
     }
   }catch(Throwable e) {
     logmsg("Settings file not found or was corrupt: " + e);
-    NO_DAMAGE.state     = false;
-    DEBUG_INFO.state = false;
+    NO_DAMAGE.state   = false;
+    DEBUG_INFO.state  = false;
+    TIMING_INFO.state = false;
     menuSettings = new JSONObject();
     for(settingButton b : settings) {
       menuSettings.setBoolean(b.txt, b.state);
@@ -831,7 +835,7 @@ void draw() {
   }
   scale(scaleFact);
   previousCursor = activeCursor;
-  if(DEBUG_INFO.state) {
+  if(TIMING_INFO.state) {
     if(millis() > timerUpdateTime) {
       checkTimes = true;
       timerUpdateTime = millis() + TIMER_UPDATE_FREQUENCY;
@@ -865,7 +869,7 @@ void draw() {
         image(loading_animation_buffer, gameWidth, gameHeight);
       }
     } break;
-    case "gameSelect": {
+    case "gameSelect": { //This isn't over engineered or stupid whatsoever
       activeCursor = ARROW;
       background(0);
       stroke(128);
@@ -874,22 +878,30 @@ void draw() {
       line(gameWidth / 2, gameHeight * 1/4, gameWidth / 2, gameHeight * 8 / 9);
       strokeCap(PROJECT);
       imageMode(CENTER);
-      noStroke();
       image(text_logo, gameWidth / 2, text_logo.height / 2);
+      noStroke();
+      textFont(defaultFont, 50);
+      float lerpAmount = 60.0 / frameRate;
+      float fontRounder = 16.0;
       gameSelect_songSelect_actual = Math.floorMod(gameSelect_songSelect_actual, songList.size());
-      gameSelect_songSelect = lerp(gameSelect_songSelect, gameSelect_songSelect_actual, 0.1);
+      gameSelect_songSelect = lerp(gameSelect_songSelect, gameSelect_songSelect_actual, lerpAmount);
 
       int min_s = gameSelect_songSelect_actual - GAMESELECT_SONGDISPLAYCOUNT;
       int max_s = min(gameSelect_songSelect_actual + GAMESELECT_SONGDISPLAYCOUNT, songList.size());
-      textFont(defaultFont, 50);
+
+      float extraYoffset = 0;
+      for(int i = max(0, min_s); i < gameSelect_songSelect_actual; i++) {
+        float fontSize = max(2, 50 - 7 * pow(abs(i - int(fontRounder * gameSelect_songSelect) / fontRounder), 0.9));
+        String songTitle = WordUtils.wrap(songList.get(i).title, 32, "\n", true);
+        extraYoffset += fontSize * (songTitle.length() - songTitle.replace("\n", "").length());
+      }
+      gameSelectExtraYOffset = lerp(gameSelectExtraYOffset, extraYoffset, lerpAmount);
+      float tx = -500, ty = 150 - gameSelectExtraYOffset, y_offset = 0;
 
       pushMatrix();
-      float tx = -525, ty = 150;
       translate(tx, ty);
-      float y_offset = 0;
-      for(int i = min_s; i < max_s; i++) { //I tryharded this portion, give me money
-        float v = 16;
-        float fontSize = max(2, 50 - 7 * pow(abs(i - int(v * gameSelect_songSelect) / v), 0.9));
+      for(int i = min_s; i < max_s; i++) {
+        float fontSize = max(2, 50 - 7 * pow(abs(i - int(fontRounder * gameSelect_songSelect) / fontRounder), 0.9));
         String songTitle = "";
         int newlineCount = 0;
         float offset_y_tmp = 0;
@@ -903,58 +915,60 @@ void draw() {
           newlineCount = songTitle.length() - songTitle.replace("\n", "").length();
           offset_y_tmp = newlineCount * fontSize / 2.0;
           y_offset += offset_y_tmp;
-          text(songTitle, gameWidth / 2, 250 + y_offset);
-          if(i == gameSelect_songSelect_actual) {
-            float txtWid = textWidth(songTitle);
-            float sw = txtWid / 2;
-            float border_expand_y = 27.5 * (newlineCount + 1);
-            if(curX - tx > gameWidth / 2 - (60 + sw) && curX - tx < gameWidth / 2 + (60 + sw) && curY - ty > 250 + y_offset + 6.75 - border_expand_y && curY - ty < 250 + y_offset + 6.75 + border_expand_y) {
-              mouseOverSong = true;
-              if(mousePressed) {
-                fill(255, 128, 128);
-                activeCursor = MOVE;
+          if(fontSize > 2) {
+            text(songTitle, gameWidth / 2, 250 + y_offset);
+            if(i == gameSelect_songSelect_actual) {
+              float txtWid = textWidth(songTitle);
+              float sw = txtWid / 2;
+              float border_expand_y = 27.5 * (newlineCount + 1);
+              if(curX - tx > gameWidth / 2 - (60 + sw) && curX - tx < gameWidth / 2 + (60 + sw) && curY - ty > 250 + y_offset + 6.75 - border_expand_y && curY - ty < 250 + y_offset + 6.75 + border_expand_y) {
+                mouseOverSong = true;
+                if(mousePressed) {
+                  fill(255, 128, 128);
+                  activeCursor = MOVE;
+                }else{
+                  fill(255, 200, 200);
+                  activeCursor = HAND;
+                }
               }else{
-                fill(255, 200, 200);
-                activeCursor = HAND;
+                mouseOverSong = false;
+                fill(255);
               }
-            }else{
-              mouseOverSong = false;
-              fill(255);
-            }
-            triangle(
-              gameWidth / 2 + sw + 15, 250 + y_offset + 6.75,
-              gameWidth / 2 + sw + 55, 250 + y_offset + 6.75 - 20,
-              gameWidth / 2 + sw + 55, 250 + y_offset + 6.75 + 20);
-            triangle(
-              gameWidth / 2 - sw - 15, 250 + y_offset + 6.75,
-              gameWidth / 2 - sw - 55, 250 + y_offset + 6.75 - 20,
-              gameWidth / 2 - sw - 55, 250 + y_offset + 6.75 + 20);
-            
-            if(i != songList.size() - 1) {
-              float descSize = 40;
-              textSize(descSize);
-              textLeading(descSize + 5);
-              textAlign(LEFT, TOP);
-              fill(255);
+              triangle(
+                gameWidth / 2 + sw + 15, 250 + y_offset + 6.75,
+                gameWidth / 2 + sw + 55, 250 + y_offset + 6.75 - 20,
+                gameWidth / 2 + sw + 55, 250 + y_offset + 6.75 + 20);
+              triangle(
+                gameWidth / 2 - sw - 15, 250 + y_offset + 6.75,
+                gameWidth / 2 - sw - 55, 250 + y_offset + 6.75 - 20,
+                gameWidth / 2 - sw - 55, 250 + y_offset + 6.75 + 20);
+              
+              if(i != songList.size() - 1) {
+                float descSize = 40;
+                textSize(descSize);
+                textLeading(descSize + 5);
+                textAlign(LEFT, TOP);
+                fill(255);
 
-              String songTitleShort = WordUtils.wrap(currentElement.title, 16, "\n", true);
-              int newlineCountShort = songTitleShort.length() - songTitleShort.replace("\n", "").length();
+                String songTitleShort = WordUtils.wrap(currentElement.title, 16, "\n", true);
+                int newlineCountShort = songTitleShort.length() - songTitleShort.replace("\n", "").length();
 
-              String newLines = "";
-              for(int tmp = 0; tmp < newlineCountShort; tmp++) {newLines += '\n';}
-              String detailsLeft = "Title:"+newLines;
-              String detailsRight = songTitleShort;
-              if(currentElement.author != null && currentElement.author.length() > 0) {
-                detailsLeft += "\nArtist:";
-                detailsRight += '\n' + currentElement.author;
+                String newLines = "";
+                for(int tmp = 0; tmp < newlineCountShort; tmp++) {newLines += '\n';}
+                String detailsLeft = "Title:"+newLines;
+                String detailsRight = songTitleShort;
+                if(currentElement.author != null && currentElement.author.length() > 0) {
+                  detailsLeft += "\nArtist:";
+                  detailsRight += '\n' + currentElement.author;
+                }
+                if(currentElement.duration != null && currentElement.duration.length() > 0) {
+                  detailsLeft += "\nDuration:";
+                  detailsRight += '\n' + currentElement.duration;
+                }
+
+                text(detailsLeft , gameWidth / 2 + descSize / 2 - tx, gameHeight * 1/4 + 3 - ty);
+                text(detailsRight, gameWidth / 2 + descSize / 2 + 10 * descSize - tx, gameHeight * 1/4 + 3 - ty);
               }
-              if(currentElement.duration != null && currentElement.duration.length() > 0) {
-                detailsLeft += "\nDuration:";
-                detailsRight += '\n' + currentElement.duration;
-              }
-
-              text(detailsLeft , gameWidth / 2 + descSize / 2 - tx, gameHeight * 1/4 + 3 - ty);
-              text(detailsRight, gameWidth / 2 + descSize / 2 + 10 * descSize - tx, gameHeight * 1/4 + 3 - ty);
             }
           }
         }
@@ -1524,50 +1538,55 @@ void draw() {
     }
   }
 
-  if(DEBUG_INFO.state) {
-    fill(0, 64);
-    noStroke();
-    rectMode(CORNER);
-    float rectWidth           = 400;
-    float textFontSize        = 18;
-    float topPadding          = 75;
-    float rightPadding        = 2;
-    float textPaddingSides    = 5;
-    float textPaddingVertical = 2;
-
-    float adjTextHeight = textFontSize + textPaddingVertical;
-    float rectHeight = timingDisplay.size() * adjTextHeight + textPaddingVertical * 3;
-    rect(gameWidth - rectWidth - rightPadding, topPadding, rectWidth, rectHeight);
-    textFont(defaultFont, textFontSize);
-    fill(255);
-    int i = 0;
-    float y = textPaddingVertical + topPadding;
-    for(Map.Entry<String, String> entry : timingDisplay.entrySet()) {
-      textAlign(LEFT, TOP);
-      text(entry.getKey()  , gameWidth - rightPadding + textPaddingSides - rectWidth, y);
-      textAlign(RIGHT, TOP); 
-      text(entry.getValue(), gameWidth - rightPadding - textPaddingSides            , y);
-      i++;
-      y += adjTextHeight;
+  { //Overlays
+    float timing_rectWidth           = 400;
+    float timing_textFontSize        = 18;
+    float timing_topPadding          = 75;
+    float timing_rightPadding        = 2;
+    float timing_textPaddingSides    = 5;
+    float timing_textPaddingVertical = 2;
+    float timing_adjTextHeight = timing_textFontSize + timing_textPaddingVertical;
+    float timing_rectHeight = timingDisplay.size() * timing_adjTextHeight + timing_textPaddingVertical * 3;
+    float timing_y = timing_textPaddingVertical + timing_topPadding;
+    if(TIMING_INFO.state) { //Timing info
+      fill(0, 64);
+      noStroke();
+      rectMode(CORNER);
+      if(timingDisplay.size() > 0) {
+        rect(gameWidth - timing_rectWidth - timing_rightPadding, timing_topPadding, timing_rectWidth, timing_rectHeight);
+        textFont(defaultFont, timing_textFontSize);
+        fill(255);
+        int i = 0;
+        for(Map.Entry<String, String> entry : timingDisplay.entrySet()) {
+          textAlign(LEFT, TOP);
+          text(entry.getKey()  , gameWidth - timing_rightPadding + timing_textPaddingSides - timing_rectWidth, timing_y);
+          textAlign(RIGHT, TOP); 
+          text(entry.getValue(), gameWidth - timing_rightPadding - timing_textPaddingSides            , timing_y);
+          i++;
+          timing_y += timing_adjTextHeight;
+        }
+      }
     }
-    msgList.x = gameWidth - 8;
-    msgList.y = y;
-    msgList.draw(g);
-  }
-  if(SHOW_FPS.state) { //FPS Tracker
-    rectMode(CORNER);
-    noStroke();
-    fill(25, 128);
-    rect(gameWidth - 72, 2, 70, 35, 3);
-    float warnIntensity = clampMap(fps_tracker, 0, 120, 0, 255);
-    fill(255, warnIntensity, warnIntensity);
-    textAlign(LEFT, BOTTOM);
-    textSize(15);
-    textLeading(15);
-    gameFrameCount++;
-    gameFrameRateTotal += frameRate;
-    text("FPS: " + nf(min(999, round(fps_tracker)), 3) + "\nAdv: " + nf(min(999, round(gameFrameRateTotal / gameFrameCount)), 3), gameWidth - 70, 35);
-    fps_tracker = lerp(fps_tracker, frameRate, 1 / frameRate);
+    if(DEBUG_INFO.state) { //Debug log
+      msgList.x = gameWidth - 8;
+      msgList.y = timing_y;
+      msgList.draw(g);
+    }
+    if(SHOW_FPS.state) { //FPS Tracker
+      rectMode(CORNER);
+      noStroke();
+      fill(25, 128);
+      rect(gameWidth - 72, 2, 70, 35, 3);
+      float warnIntensity = clampMap(fps_tracker, 0, 120, 0, 255);
+      fill(255, warnIntensity, warnIntensity);
+      textAlign(LEFT, BOTTOM);
+      textSize(15);
+      textLeading(15);
+      gameFrameCount++;
+      gameFrameRateTotal += frameRate;
+      text("FPS: " + nf(min(999, round(fps_tracker)), 3) + "\nAdv: " + nf(min(999, round(gameFrameRateTotal / gameFrameCount)), 3), gameWidth - 70, 35);
+      fps_tracker = lerp(fps_tracker, frameRate, 1 / frameRate);
+    }
   }
   popMatrix();
 
@@ -1604,6 +1623,7 @@ void draw() {
 void exit() {
   logmsg("Exiting, saving settings.");
   menuSettings.setFloat("volume", volSlider.val);
+  menuSettings.setFloat("intensity", difficultySlider.val);
   if(monitorID != monitorOptions.selectedIndex + 1) {
     monitorID = monitorOptions.selectedIndex + 1;
     logmsg("Monitor ID: " + monitorID);

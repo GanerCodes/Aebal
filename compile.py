@@ -31,3 +31,4 @@ checkFolder(f"{os.path.dirname(__file__)}", False)
 # print(f"Code Files:"+'\n\t'.join([''] + fileList))
 
 print("Line count:", len(list(filter(lambda x: len(x.strip()), sum((open(i, 'r').read().split('\n') for i in fileList), [])))))
+input()
