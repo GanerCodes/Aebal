@@ -35,7 +35,6 @@ PVector pos, previousPos, randTrans, prevTrailLoc, trailLoc, chroma_r, chroma_g,
 Sound song, hitSound, buttonSFX, textSFX, volChangeSFX, songSelChange, gainScore;
 Sound[] soundList;
 Minim minim;
-FFT fft;
 color backColor, globalObjColor;
 PGraphics back, loading_animation_buffer;
 PImage screen, text_logo, image_gear, image_back, image_settings, image_paused;
@@ -270,7 +269,6 @@ void loadSong() {
   song.setDefaultVolume(-20);
   song.setVol(volSlider.val);
   song.sound.play();
-  fft = new FFT(song.sound.bufferSize(), song.sound.sampleRate());
   setScene("game");
 }
 
@@ -320,16 +318,29 @@ float adjMillis() {
 }
 
 class Sound {
+  final String SFX_PATH_PREFIX = "assets/SFX/";
+
   AudioPlayer sound;
   float defaultVolume, vol;
   Sound(AudioPlayer sound, float defaultVolume) {
     this.sound = sound;
     this.defaultVolume = defaultVolume;
     this.vol = 1;
-    sound.setGain(defaultVolume);
+    this.sound.setGain(defaultVolume);
+  }
+  Sound(String sound, float defaultVolume) {
+    this.sound = minim.loadFile(sketchPath(SFX_PATH_PREFIX + sound));
+    this.defaultVolume = defaultVolume;
+    this.vol = 1;
+    this.sound.setGain(defaultVolume);
   }
   Sound(AudioPlayer sound) {
     this.sound = sound;
+    this.defaultVolume = 0;
+    this.vol = 1;
+  }
+  Sound(String sound) {
+    this.sound = minim.loadFile(sketchPath(SFX_PATH_PREFIX + sound));;
     this.defaultVolume = 0;
     this.vol = 1;
   }
@@ -677,12 +688,12 @@ void setup() {
 
   minim = new Minim(this);
   soundList = new Sound[] {
-    songSelChange = new Sound(minim.loadFile(sketchPath("assets/SFX/songSelChange.wav")), -15),
-    volChangeSFX  = new Sound(minim.loadFile(sketchPath("assets/SFX/volChange.wav"    )), -12),
-    buttonSFX     = new Sound(minim.loadFile(sketchPath("assets/SFX/button.wav"       )), -12),
-    gainScore     = new Sound(minim.loadFile(sketchPath("assets/SFX/gainScore.wav"    )), -20),
-    hitSound      = new Sound(minim.loadFile(sketchPath("assets/SFX/hit.wav"          )), -3 ),
-    textSFX       = new Sound(minim.loadFile(sketchPath("assets/SFX/textSFX.wav"      )), -18),
+    songSelChange = new Sound("songSelChange.wav", -15),
+    volChangeSFX  = new Sound("volChange.wav"    , -12),
+    buttonSFX     = new Sound("button.wav"       , -12),
+    gainScore     = new Sound("gainScore.wav"    , -20),
+    hitSound      = new Sound("hit.wav"          , -3 ),
+    textSFX       = new Sound("textSFX.wav"      , -18),
     song          = new Sound(-20)
   };
   textSFX.sound.setLoopPoints(20, 500);
@@ -703,7 +714,7 @@ void setup() {
     BACKGROUND_BLOBS         = new settingButton(0, 0, 75, 75, 5, "Background Blobs"    , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     DO_FANCY_TRAILS          = new settingButton(0, 0, 75, 75, 5, "Fancy Trails"        , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     BACKGROUND_FADE          = new settingButton(0, 0, 75, 75, 5, "Background Fade"     , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
-    SHOW_SONG_NAME           = new settingButton(0, 0, 75, 75, 5, "Show Song Name"     , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
+    SHOW_SONG_NAME           = new settingButton(0, 0, 75, 75, 5, "Show Song Name"      , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     DO_HIT_PROMPTS           = new settingButton(0, 0, 75, 75, 5, "Score Ticks"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     DEBUG_INFO               = new settingButton(0, 0, 75, 75, 5, "Debug Info"          , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
     TIMING_INFO              = new settingButton(0, 0, 75, 75, 5, "Timing Info"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
@@ -987,7 +998,6 @@ void draw() {
 
     case "game": {
       TT("Physics");
-      fft.forward(song.sound.mix);
       float tmp_intensity = findComplexity(song.sound.mix.toArray()) * (0.65 + (0.2 + song.sound.mix.level()) / 2.0);
       if(tmp_intensity < 0.1) {
         tmp_intensity = pow(tmp_intensity, 1.0 / 3) / 4.65;

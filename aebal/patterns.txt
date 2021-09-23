@@ -4,7 +4,7 @@
 # Spawn patterns [Parametric]:
 L: cos(t)/(abs(sin(t)+abs(cos(t)))+abs(cos(t)))|sin(t)/(abs(sin(t)+abs(cos(t)))+abs(cos(t)))
 L: cos(t)/max(abs(cos(t)),abs(sin(t)))|sin(t)/max(abs(cos(t)),abs(sin(t)))
-L: 1/6*16*pow(sin(t),3)|1/6*(13*cos(t)-5*cos(2*t)-2*cos(3*t)-cos(4*t))||2
+L: 1/6*16*pow(sin(t),3)|1/6*(13*cos(t)-5*cos(2*t)-2*cos(3*t)-cos(4*t))||1.5
 L: cos(t)|sin(t)
 
 # Velocity patterns [Implicit]
