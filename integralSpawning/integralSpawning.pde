@@ -1,21 +1,13 @@
-import ddf.minim.*;
+import ddf.minim.Minim;
+import ddf.minim.AudioPlayer;
+import ddf.minim.AudioSample;
 
 int SAMPLES_PER_SECOND = 1024;
+float GAME_MARGIN_SIZE = 150;
 float DEFAULT_SPEED = 2;
 boolean SHOW_GUI = true;
 
-
-int sgn(float f) { return f > 0 ? 1 : (f < 0 ? -1 : 0); }
-boolean GTLT (float a, float b, float c) { return a >  b && a <  c; }
-boolean LTGT (float a, float b, float c) { return a <  c && a >  b; }
-boolean GTLTE(float a, float b, float c) { return a >= b && a <= c; }
-boolean LTGTE(float a, float b, float c) { return a <= c && a >= b; }
-boolean GTLT (int   a, int   b, int   c) { return a >  b && a <  c; }
-boolean LTGT (int   a, int   b, int   c) { return a <  c && a >  b; }
-boolean GTLTE(int   a, int   b, int   c) { return a >= b && a <= c; }
-boolean LTGTE(int   a, int   b, int   c) { return a <= c && a >= b; }
-
-SongMap songMap;
+GameMap gameMap;
 Minim minim; 
 PGraphics viz;
 
@@ -25,36 +17,33 @@ void setup() {
     minim = new Minim(this);
 
     int startMillis = millis();
-    songMap = new SongMap("song4.mp3", new PVector(1920, 1080));
+    gameMap = new GameMap("song4.mp3", new PVector(width, height));
     println(String.format("Map generation took %s", (millis() - startMillis) / 1000.0));
     
     viz = createGraphics(width, height, P2D);
     viz.beginDraw();
     viz.stroke(255);
     viz.strokeWeight(1);
-    for(int i = 0; i < songMap.complexityArr.length; i++) {
-        float x = map(i, 0, songMap.complexityArr.length, 0, width);
-        viz.line(x, height, x, height - songMap.complexityArr[i] * height / 10.0);
+    for(int i = 0; i < gameMap.complexityArr.length; i++) {
+        float x = map(i, 0, gameMap.complexityArr.length, 0, width);
+        viz.line(x, height, x, height - gameMap.complexityArr[i] * height / 10.0);
     }
     viz.endDraw();
 
-    songMap.song.play();
-    songMap.song.setGain(-20);
+    gameMap.song.play();
+    gameMap.song.setGain(-20);
 
+    strokeCap(PROJECT);
     frameRate(1000);
 }
 void draw() {
-    strokeCap(PROJECT);
-    float time = songMap.song.position() / 1000.0;
-    songMap.addRecentEnemies(time);
+    float time = gameMap.song.position() / 1000.0;
+    gameMap.updateEnemies(time);
 
-    int audioIndex = int(map(songMap.song.position(), 0, songMap.song.length(), 0, songMap.complexityArr.length));
-    float c = songMap.complexityArr[audioIndex];
+    int audioIndex = int(map(gameMap.song.position(), 0, gameMap.song.length(), 0, gameMap.complexityArr.length));
+    float c = gameMap.complexityArr[audioIndex];
 
-    colorMode(HSB);
-    background(c * 100, 150, c * 100);
-    colorMode(RGB);
-
+    background(c * 100);
     if(SHOW_GUI) {
         image(viz, 0, 0);
         stroke(255);
@@ -62,10 +51,10 @@ void draw() {
         int r = int(SAMPLES_PER_SECOND);
         for(int i = max(0, audioIndex - r); i < audioIndex; i++) {
             float x = width / 2.0 + width / 3.0 * map(i, audioIndex - r, audioIndex, -1, 1);
-            line(x, 0, x, height / 8.0 * songMap.complexityArr[i]);
+            line(x, 0, x, height / 8.0 * gameMap.complexityArr[i]);
         }   
         
-        float redLineX = map(songMap.song.position(), 0, songMap.song.length(), 0, width);
+        float redLineX = map(gameMap.song.position(), 0, gameMap.song.length(), 0, width);
         stroke(255, 0, 0);
         strokeWeight(2);
         line(redLineX, 0, redLineX, height);
@@ -73,17 +62,16 @@ void draw() {
 
     fill(255);
     noStroke();
-    for(Enemy e : songMap.enemies) {
-        if(time > e.spawnTime) {
-            PVector pos = e.getLoc(time);
-            ellipse(pos.x, pos.y, 20, 20);
-        }
+    for(Enemy e : gameMap.enemies) {
+        PVector pos = e.getLoc(time);
+        circle(pos.x, pos.y, 20);
     }
     textAlign(LEFT, TOP);
-    text(time, 0, 0);
+    text(frameRate+"\n"+time+"\n"+gameMap.enemies.size(), 0, 0);
 }
 void mouseClicked() {
-    songMap.song.cue((int)map(mouseX, 0, width, 0, songMap.song.length()));
+    gameMap.song.cue((int)map(mouseX, 0, width, 0, gameMap.song.length()));
+    gameMap.resetEnemies();
 }
 void keyPressed() {
     SHOW_GUI = !SHOW_GUI;

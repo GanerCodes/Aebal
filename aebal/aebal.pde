@@ -31,7 +31,8 @@ int curX, curY, monitorID, cancerCount, score, hitCount, gameFrameCount, duratio
 float gameFrameRateTotal, scrollWait, fps_tracker, gameSelect_songSelect, gameSelectExtraYOffset, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, song_total_intensity, millisDelta, fadeDuration = 5000, fadeOpacityStart = 400, fadeOpacityEnd = 0, grayScaleTimer = 100, trailingAngle = 0, trailStrokeWeight = 4.5;
 String delayedSceneScene, settingsFileLoc, songDataFileLoc, previousScene, gameState = "title";
 int[] cancerKeys = {UP, UP, DOWN, DOWN, LEFT, RIGHT, LEFT, RIGHT, 66, 65, ENTER};
-PVector pos, previousPos, randTrans, prevTrailLoc, trailLoc, chroma_r, chroma_g, chroma_b;
+RNG GFX_R, GAME_R;
+PVector pos, previousPos, randTrans, prevTrailLoc, screenSize, trailLoc, chroma_r, chroma_g, chroma_b;
 Sound song, hitSound, buttonSFX, textSFX, volChangeSFX, songSelChange, gainScore;
 Sound[] soundList;
 Minim minim;
@@ -89,27 +90,6 @@ int getOnScreenObjCount() {
   return i;
 }
 
-boolean lineIntersection(PVector a, PVector b, PVector c, PVector d) { //Yea, I wrote this, not to flex or anything 😎
-  return (b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x)>=0?(d.x-c.x)*(b.y-c.y)-(d.y-c.y)*(b.x-c.x)>=0&&(b.x-a.x)*(d.y-a.y)-(b.y-a.y)*(d.x-a.x)<=0&&(d.x-c.x)*(a.y-c.y)-(d.y-c.y)*(a.x-c.x)<=0:(d.x-c.x)*(b.y-c.y)-(d.y-c.y)*(b.x-c.x)<=0&&(b.x-a.x)*(d.y-a.y)-(b.y-a.y)*(d.x-a.x)>=0&&(d.x-c.x)*(a.y-c.y)-(d.y-c.y)*(a.x-c.x)>=0;
-}
-boolean inBounds(PVector loc, PVector boxLoc, PVector boxSize) {
-    return loc.x >= boxLoc.x && loc.x <= boxLoc.x + boxSize.x && loc.y >= boxLoc.y && loc.y <= boxLoc.y + boxSize.y;
-}
-boolean squareIntersection(PVector loc, float s, PVector a, PVector b) { //This is center aligned, for some reason
-  return
-  lineIntersection(vec2(loc.x - s / 2, loc.y - s / 2), vec2(loc.x + s / 2, loc.y - s / 2), a, b) || 
-  lineIntersection(vec2(loc.x + s / 2, loc.y - s / 2), vec2(loc.x + s / 2, loc.y + s / 2), a, b) || 
-  lineIntersection(vec2(loc.x + s / 2, loc.y + s / 2), vec2(loc.x - s / 2, loc.y + s / 2), a, b) || 
-  lineIntersection(vec2(loc.x - s / 2, loc.y + s / 2), vec2(loc.x - s / 2, loc.y - s / 2), a, b);
-}
-boolean rectIntersection(PVector loc, PVector s, PVector a, PVector b) { //Corner aligned as it should be
-  return
-  lineIntersection(new PVector(loc.x      , loc.y      ), new PVector(loc.x + s.x, loc.y      ), a, b) || 
-  lineIntersection(new PVector(loc.x + s.x, loc.y      ), new PVector(loc.x + s.x, loc.y + s.y), a, b) || 
-  lineIntersection(new PVector(loc.x + s.x, loc.y + s.y), new PVector(loc.x      , loc.y + s.y), a, b) || 
-  lineIntersection(new PVector(loc.x      , loc.y + s.y), new PVector(loc.x      , loc.y      ), a, b);
-}
-
 void moveSongSel(int a) {
   gameSelect_songSelect_actual += a;
   songSelChange.playR();
@@ -117,8 +97,8 @@ void moveSongSel(int a) {
 
 PVector generateLoc(float d) {
   float largestAxisSize = max(gameWidth, gameHeight);
-  float a = random(-PI, PI);
-  float r = random(largestAxisSize + 12, largestAxisSize + d);
+  float a = GAME_R.randC(PI);
+  float r = GAME_R.rand(largestAxisSize + 12, largestAxisSize + d);
   float cosA = cos(a);
   float sinA = sin(a);
   return vec2(r / cosA * min(abs(cosA), abs(sinA)), r / sinA * min(abs(cosA), abs(sinA)));
@@ -292,12 +272,9 @@ void selectLevel(songElement song) {
       floatingPrompts = new ArrayList();
       bubbleLayer = createGraphics(gameWidth, gameHeight, P2D);
       for(int i = 0; i < 4; i++) {
-        bubbles.add(new bubble(vec2(s_random(0, gameWidth), s_random(0, gameHeight))));
+        bubbles.add(new bubble(vec2(GFX_R.rand(0, gameWidth), GFX_R.rand(0, gameHeight))));
       }
-      int randomSeed = song.title.hashCode();
-      logmsg("Random seed for \"" + song.title + "\": " + randomSeed);
-      randomSeed(randomSeed);
-      unimportantRandoms.setSeed(randomSeed);
+      logmsg("Random seed for \"" + song.title + "\": " + GAME_R.setSeed(song.title.hashCode()));
       thread("loadSong");
     } break;
   }
@@ -463,12 +440,12 @@ class bubble {
   int size = 750;
   bubble(PVector loc) {
     this.loc = loc;
-    float ang = s_random(0, TWO_PI);
+    float ang = GFX_R.rand(0, TWO_PI);
     vel = mulVec(
-      PVector.fromAngle(ang).mult(random(1.5, 2.5)),
-      vec2(rSign(), rSign())
+      PVector.fromAngle(ang).mult(GFX_R.random(1.5, 2.5)),
+      vec2(GFX_R.rSign(), GFX_R.rSign())
     );
-    timer_offset = s_random(0, 1000000);
+    timer_offset = GFX_R.rand(1000000);
   }
   void update() {
     loc.add(PVector.mult(vel, max(0.01, pow(2 * max(0.01, c - 0.08), 3))));
@@ -678,7 +655,9 @@ void setup() {
     }
   }
 
-  unimportantRandoms = new Random();
+  screenSize = new PVector(gameWidth, gameHeight);
+  GFX_R = new RNG();
+  GAME_R = new RNG();
   timingList    = new HashMap();
   timingDisplay = new HashMap();
   timerFormat = new DecimalFormat("##.####");
@@ -738,22 +717,7 @@ void setup() {
 
   locExpressions = new ArrayList();
   velExpressions = new ArrayList();
-  String[] patternFile = loadStrings("patterns.txt");
-  for(String s : patternFile) {
-    s = trim(split(s, "#")[0]);
-    if(s.length() < 3 || s.charAt(0) == '#') continue;
-    String[] spl = split(s.substring(2), "|");
-    for(int i = 0; i < spl.length; i++) {
-      spl[i] = trim(spl[i]);
-    }
-    boolean isParametric = s.substring(0, 2).equals("L:");
-    addExpression(isParametric ? locExpressions : velExpressions, spl[0], spl[1], 
-      spl.length > 2 && spl[2].length() > 0 ? float(spl[2]) : 1, 
-      spl.length > 3 && spl[3].length() > 0 ? float(spl[3]) : 1, 
-      spl.length > 4 && spl[4].length() > 0 ? float(spl[4]) : 1, 
-      isParametric ? 'p' : 'i'
-    );
-  }
+  loadPatternFile("patterns.txt", locExpressions, velExpressions);
 
   settingsFileLoc = sketchPath("settings.json");
   songDataFileLoc = sketchPath("songData.json");
@@ -1018,18 +982,18 @@ void draw() {
 
       { //Physics
         if (objSpawnTimer <= 0 && DO_ENEMY_SPAWNING) { //Object spawning
-          float speed = random(5, 12) * (1 + 3.5 * c);
+          float speed = GAME_R.random(5, 12) * (1 + 3.5 * c);
           
           float v = min(gameHeight, f.size * 1.5) / 2;
-          PVector loc = random(0, 1) <= 0.15 ? pos.copy() : vec2(gameWidth / 2 + random(-v, v), gameHeight / 2 + random(-v, v));
+          PVector loc = GAME_R.random(0, 1) <= 0.15 ? pos.copy() : vec2(gameWidth / 2 + GAME_R.random(-v, v), gameHeight / 2 + GAME_R.random(-v, v));
           float dis = 1.5 * sqrt(sq(gameWidth) + sq(gameHeight));
-          float n = int(random(3, 3 + c * 4));
+          float n = int(GAME_R.random(3, 3 + c * 4));
         
-          float rng = random(c / 10, max(1, c * 2));
+          float rng = GAME_R.random(c / 10, max(1, c * 2));
           if(cancerMode) rng = min(1, rng * 2.5);
           int SPAWN_PATTERN = 0;
 
-          if(random(0, 1) < min(0.15, (c - 0.25))) {
+          if(GAME_R.rProp(min(0.15, (c - 0.25)))) {
             objSpawnTimer = max(objSpawnTimer, 0) + c * 15;
             if(rng < 0.3) {
               SPAWN_PATTERN = 1;
@@ -1050,23 +1014,23 @@ void draw() {
             case 0: { //Single
 
               loc = generateLoc(300);
-              float TLX = lerp(random(gameWidth  / 2 - f.size / 2, gameWidth  / 2 + f.size / 2), pos.x, random(0, 1));
-              float TLY = lerp(random(gameHeight / 2 - f.size / 2, gameHeight / 2 + f.size / 2), pos.y, random(0, 1));
+              float TLX = lerp(GAME_R.random(gameWidth  / 2 - f.size / 2, gameWidth  / 2 + f.size / 2), pos.x, GAME_R.random());
+              float TLY = lerp(GAME_R.random(gameHeight / 2 - f.size / 2, gameHeight / 2 + f.size / 2), pos.y, GAME_R.random());
               addEnemy(loc, PVector.fromAngle(atan2(TLY - loc.y, TLX - loc.x)).mult(speed));
             } break;
             case 1: { //star, circle, spiral
 
-              boolean isSpiral = random(0, 1) < 0.2;
+              boolean isSpiral = GAME_R.rProp(0.2);
               if(isSpiral) {
                 speed /= 2;
               }else{
                 speed /= 1.2;
               }
-              float isCircle = random(0, 1) < 0.33 ? random(450, 550) - c * 125 : 0;
+              float isCircle = GAME_R.rProp(0.33) ? GAME_R.random(450, 550) - c * 125 : 0;
               if(isCircle > 0) {
                 n = n * 3 + int(c * 3.5);
               }
-              float rad = random(0, 1) <= 0.5 ? 0 : random(0, 250);
+              float rad = GAME_R.rBool() ? 0 : GAME_R.random(250);
               float adder = isSpiral ? (0.35 - min(c, 1.5) / 15) : (2 * PI) / n;
               for(float a = 0; a < TWO_PI; a += adder) {
                 float adjA = a + QUARTER_PI;
@@ -1079,7 +1043,7 @@ void draw() {
             } break;
             case 2: { //Line
 
-              float a = random(0, 2 * PI);
+              float a = GAME_R.random(2 * PI);
               speed /= 1.1;
               n = 3 + c * 14;
               for(int l = -int(n); l <= n; l++) {
@@ -1095,9 +1059,9 @@ void draw() {
             case 3: { //Square & Circle
 
               float sz = 50 + c * 80;
-              float screenAngle = random(0, TWO_PI);
-              float objRot = random(0, TWO_PI) + HALF_PI;
-              boolean mode = random(0, 1) > 0.5;
+              float screenAngle = GAME_R.random(TWO_PI);
+              float objRot = GAME_R.random(TWO_PI) + HALF_PI;
+              boolean mode = GAME_R.rBool();
               float density = max(0.2, 0.5 - c / 3) / (mode ? 1.4 : 1);
               speed /= 2;
               for(float x = -1; x < 1; x += density) {
@@ -1115,7 +1079,7 @@ void draw() {
               
               float sz = 40 - c * 25;
               n = 2 * (n + int(c * 2.5)) + 1;
-              float screenAngle = random(0, TWO_PI);
+              float screenAngle = GAME_R.random(TWO_PI);
               float objRot = screenAngle + HALF_PI;
               speed /= 2;
               for(int i = 0; i < n; i++) {
@@ -1130,11 +1094,11 @@ void draw() {
             } break;
             case 5: { //Triangle, square, pentagon, hexagon
 
-              n = int(random(3, 6.25));
+              n = int(GAME_R.random(3, 6.25));
               int d = 1 + int(c * 5);
-              float sz = random(250, 750 - c * 250);
-              float objRot = random(0, TWO_PI);
-              loc.lerp(vec2(gameWidth / 2, gameHeight / 2), random(0, 1));
+              float sz = GAME_R.random(250, 750 - c * 250);
+              float objRot = GAME_R.random(TWO_PI);
+              loc.lerp(vec2(gameWidth / 2, gameHeight / 2), GAME_R.random());
               for(float i = 0; i < TWO_PI; i += TWO_PI / (n * d)) {
                 PVector objLoc = PVector.fromAngle(TWO_PI / n * floor(n * i / TWO_PI)).lerp(PVector.fromAngle(TWO_PI / n * ceil(n * i / TWO_PI)), (i * n / TWO_PI) % 1.0).rotate(objRot).mult(sz).add(loc);
                 PVector objVel = PVector.sub(loc, objLoc).setMag(1).rotate(HALF_PI);
@@ -1145,7 +1109,7 @@ void draw() {
               }
             } break;
             case 6: {
-              objs.addAll(getRandomGroup(locExpressions, velExpressions, max(50, int(c * 30)), max(1, c + 0.25), max(0.2, 2 - c)));
+              objs.addAll(getRandomGroup(locExpressions, velExpressions, screenSize, GAME_R, max(50, int(c * 30)), max(1, c + 0.25), max(0.2, 2 - c)));
               objSpawnTimer += 60;
             } break;
           }
@@ -1165,7 +1129,7 @@ void draw() {
         rectMode(CENTER);
         activeCursor = -1;
 
-        randTrans = DO_SHAKE.state ? vec2(s_random(10 * -c, 10 * c), s_random(10 * -c, 10 * c)) : vec2();
+        randTrans = DO_SHAKE.state ? vec2(GFX_R.rand(10 * -c, 10 * c), GFX_R.rand(10 * -c, 10 * c)) : vec2();
         ang += (0.001 + constrain(c / 75, 0, 0.05)) * (200 / frameRate);
         a.speed = constrain(a.speed * (1 + constrain((c - 0.25) / 100, -0.05, 0.05)), 0.5, 1.75);
         float dfc = sqrt(sq(gameWidth) + sq(gameHeight));
@@ -1324,15 +1288,15 @@ void draw() {
         if(intense) {
           if(c >= songComplexity) {
             float offset = (2 * ((2 * c + 0.5) % 1) - 1) / 5;
-            float offset_y = s_random(-c / 6, c / 6);
-            if(s_random(0, 1) < 0.5) {
-              nextChroma_r = vec2( offset, s_random(-offset_y, offset_y));
-              nextChroma_g = vec2(-offset, s_random(-offset_y, offset_y));
-              nextChroma_b = vec2(s_random(-offset, offset), s_random(-offset_y, offset_y));
+            float offset_y = GFX_R.rand(-c / 6, c / 6);
+            if(GFX_R.rand(0, 1) < 0.5) {
+              nextChroma_r = vec2( offset, GFX_R.rand(-offset_y, offset_y));
+              nextChroma_g = vec2(-offset, GFX_R.rand(-offset_y, offset_y));
+              nextChroma_b = vec2(GFX_R.rand(-offset, offset), GFX_R.rand(-offset_y, offset_y));
             }else{
-              nextChroma_r = vec2(s_random(-offset_y, offset_y), offset);
-              nextChroma_g = vec2(s_random(-offset_y, offset_y), -offset);
-              nextChroma_b = vec2(s_random(-offset_y, offset_y), s_random(-offset, offset));
+              nextChroma_r = vec2(GFX_R.rand(-offset_y, offset_y), offset);
+              nextChroma_g = vec2(GFX_R.rand(-offset_y, offset_y), -offset);
+              nextChroma_b = vec2(GFX_R.rand(-offset_y, offset_y), GFX_R.rand(-offset, offset));
             }
           }else{
             nextChroma_r = vec2(randTrans.x / 1200.0, 0.0);

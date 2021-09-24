@@ -1,34 +1,21 @@
 import java.util.Comparator;
 
-float distToRect(PVector p, PVector v, PVector r) {
-    return v.mag() * min(
-        abs((sgn(v.x) * p.x - 0.5 * r.x) / v.x),
-        abs((sgn(v.y) * p.y - 0.5 * r.y) / v.y)
-    );
-}
-
-class enemySpawnTimeSorter implements Comparator<Enemy> {
-    @Override
-    int compare(Enemy a, Enemy b) {
-        return Float.compare(a.spawnTime, b.spawnTime);
-    }
-}
-
 class Enemy {
     PVector loc, vel;
-    float spawnTime, velOffset;
-    SongMap songMap;
-    Enemy(SongMap songMap, PVector loc, PVector vel, float spawnTime) {
-        this.songMap = songMap;
+    float spawnTime, despawnTime, velOffset;
+    GameMap GameMap;
+    Enemy(GameMap GameMap, PVector loc, PVector vel, float spawnTime, float despawnTime) {
+        this.GameMap = GameMap;
         this.loc = loc;
         this.vel = vel;
         this.spawnTime = spawnTime;
-        velOffset = songMap.getIntegralVal(songMap.SPS * spawnTime);
+        this.despawnTime = despawnTime;
+        velOffset = GameMap.getIntegralVal(GameMap.SPS * spawnTime);
     }
     PVector getLoc(float currentTime) {
         return PVector.add(
             loc, PVector.mult(
-                vel, songMap.getIntegralVal(songMap.SPS * currentTime) - velOffset
+                vel, GameMap.getIntegralVal(GameMap.SPS * currentTime) - velOffset
             )
         );
     }
@@ -37,23 +24,32 @@ class Enemy {
     }
 }
 
-class SongMap {
+class GameMap {
     int SPS, formCount, spawnIndex;
-    float finalIntegralValue, songDuration, defaultSpeed, dt;
+    float finalIntegralValue, songDuration, defaultSpeed, dt, marginSize;
     String songName;
     float[] velArr, integralArr, complexityArr;
     Enemy[] enemySpawns;
     ArrayList<Enemy> enemies;
     AudioPlayer song;
-    PVector screenSize;
+    PVector gameSize, gameCenter;
 
-    void init(PVector screenSize) {
-        this.screenSize = screenSize;
+    class enemySpawnTimeSorter implements Comparator<Enemy> {
+    @Override
+        int compare(Enemy a, Enemy b) {
+            return Float.compare(a.spawnTime, b.spawnTime);
+        }
+    }
 
+    void init(PVector gameSize) {
+        this.marginSize = GAME_MARGIN_SIZE;
+        this.gameSize = PVector.add(gameSize, new PVector(marginSize * 2, marginSize * 2));
+        this.gameCenter = PVector.mult(gameSize, 0.5);
         SPS = SAMPLES_PER_SECOND;
         dt = 1.0 / SPS;
         defaultSpeed = DEFAULT_SPEED;
     }
+
     void prepareSong(AudioSample songRaw) {
         float[] leftSamples  = songRaw.getChannel(AudioSample.LEFT );
         float[] rightSamples = songRaw.getChannel(AudioSample.RIGHT);
@@ -70,8 +66,8 @@ class SongMap {
             complexityArr[i] = findComplexity(buffer);
         }
     }
-    SongMap(String songName, PVector screenSize) {
-        init(screenSize);
+    GameMap(String songName, PVector gameSize) {
+        init(gameSize);
         this.songName = songName;
 
         song = minim.loadFile(songName);
@@ -85,11 +81,24 @@ class SongMap {
         }
         return velArr;
     }
-    void addRecentEnemies(float currentTime) {
-        while(spawnIndex < enemySpawns.length && enemySpawns[0].spawnTime < currentTime) {
-            enemies.add(enemySpawns[spawnIndex]);
+    void addRecentEnemies(float time) {
+        while(spawnIndex < enemySpawns.length && time >= enemySpawns[spawnIndex].spawnTime) {
+            Enemy e = enemySpawns[spawnIndex];
+            if(time < e.despawnTime) enemies.add(e);
             spawnIndex++;
         }
+    }
+    void removeExpiredEnemies(float time) {
+        if(enemies.size() == 0) return;
+        for(int i = enemies.size() - 1; i >= 0; i--) {
+            if(time >= enemies.get(i).despawnTime) {
+                enemies.remove(i);
+            }
+        }
+    }
+    void updateEnemies(float time) {
+        removeExpiredEnemies(time);
+        addRecentEnemies(time);
     }
     void resetEnemies() {
         spawnIndex = 0;
@@ -122,7 +131,7 @@ class SongMap {
             complexityArr[i] = c + boost;
         }
 
-        generateIntegral(generateVels(), screenSize);
+        generateIntegral(generateVels(), gameSize);
 
         { //Beat detection
             //iSec / 9 - Defines the smallest duration between a beat pattern as 1s / x
@@ -227,7 +236,7 @@ class SongMap {
         complexity /= k.length;
         return complexity;
     }
-    void generateIntegral(float[] velArr, PVector screenSize) {
+    void generateIntegral(float[] velArr, PVector gameSize) {
         integralArr = new float[velArr.length];
         integralArr[0] = 0;
         for(int i = 1; i < integralArr.length; i++) {
@@ -260,21 +269,18 @@ class SongMap {
         float currentTime = time * SPS;
         float currentVal = getIntegralVal(currentTime);
 
-        float checkDist = distToRect(loc, PVector.mult(vel, -1), screenSize) / vel.mag();
-        float checkLocation = currentVal - checkDist;
-        float startTime = getIntegralTimeDelta(checkDist, checkLocation);
-
+        float startDist = distToRect(loc, PVector.mult(vel, -1), gameSize, gameCenter) / vel.mag();
+        float startCheckLocation = currentVal - startDist;
+        float startTime = getIntegralTimeDelta(startDist, startCheckLocation);
         float startVal = getIntegralVal(startTime);
-        float timeDelta = (currentTime - startTime) / SPS;
+        
+        float finalDist = distToRect(loc, vel, gameSize, gameCenter) / vel.mag();
+        float finalCheckLocation = currentVal + finalDist;
+        float finalTime = getIntegralTimeDelta(finalDist, finalCheckLocation);
+
         float positionDelta = currentVal - startVal;
+        PVector location = PVector.sub(loc, PVector.mult(vel, positionDelta));
 
-        return new Enemy(this, PVector.sub(loc, PVector.mult(vel, positionDelta)), vel, time - timeDelta);
-
-        // println(String.format("Border distance: %s (loc: %s)", borderDist, PVector.sub(loc, vel.setMag(null, 1.0).mult(borderDist))));
-        // println(String.format("finalIntegralValue: %s, checkLocation: %s", finalIntegralValue, checkLocation));
-        // float distanceTraveled = initalLoc.dist(loc);
-        // float averageVelocity = positionDelta / timeDelta * mag;
-        // println(String.format("Integral range: %s --> %s", startTime / SPS, currentTime / SPS));
-        // println(String.format("(%s, %s) --> (%s, %s), (%s, %s), Distance Traveled: %s [%s], Spawn time offset: %ss, Average Velocity: %s", initalLoc.x, initalLoc.y, loc.x, loc.y, vel.x, vel.y, distanceTraveled, averageVelocity * timeDelta, timeDelta, averageVelocity));
+        return new Enemy(this, location, vel, startTime / SPS, finalTime / SPS);
     }
 }
