@@ -3,7 +3,7 @@ import ddf.minim.AudioPlayer;
 import ddf.minim.AudioSample;
 
 int SAMPLES_PER_SECOND = 1024;
-float GAME_MARGIN_SIZE = 150;
+float GAME_MARGIN_SIZE = 10;
 float DEFAULT_SPEED = 2;
 boolean SHOW_GUI = true;
 
@@ -13,6 +13,8 @@ PGraphics viz;
 
 void setup() {
     size(1280, 720, P2D);
+
+    new PatternSpawner("patterns.json");
 
     minim = new Minim(this);
 
@@ -62,10 +64,13 @@ void draw() {
 
     fill(255);
     noStroke();
+    pushMatrix();
+    // translate(-gameMap.marginSize, -gameMap.marginSize);
     for(Enemy e : gameMap.enemies) {
         PVector pos = e.getLoc(time);
         circle(pos.x, pos.y, 20);
     }
+    popMatrix();
     textAlign(LEFT, TOP);
     text(frameRate+"\n"+time+"\n"+gameMap.enemies.size(), 0, 0);
 }

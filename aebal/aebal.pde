@@ -233,7 +233,7 @@ void resetLevel() {
   song_intensity_count = 0;
   textSFX.sound.pause();
   textSFX.sound.rewind();
-  f = new field(max(gameWidth, gameHeight));
+  f = new field(screenSize);
   a = new arrow(gameWidth / 2, gameHeight / 2, 0, 500, 1700);
   back.beginDraw();
   back.clear();
@@ -410,27 +410,30 @@ void initializeSongs() {
 class field {
   float size;
   boolean isOutside;
-  field(float size) {
-    this.size = size;
-    this.isOutside = false;
+  PVector gameDisplaySize;
+  field(PVector gameDisplaySize) {
+    this.gameDisplaySize = gameDisplaySize;
+    size = max(gameDisplaySize.x, gameDisplaySize.y);
+    isOutside = false;
   }
   void draw() {
     rectMode(CENTER);
     noFill();
     strokeWeight(10);
     stroke(255);
-    rect(gameWidth / 2, gameHeight / 2, min(size, gameWidth - 5), min(size, gameHeight - 5));
+    rect(gameWidth / 2, gameDisplaySize.y / 2, min(size, gameWidth - 5), min(size, gameDisplaySize.y - 5));
   }
   void constrainPosition(PVector pos) {
     float mn = size / 2 - 10 - 5;
     pos.set(
-      constrain(pos.x, max(gameWidth  / 2 - mn, 15), min(gameWidth  / 2 + mn, gameWidth  - 15)),
-      constrain(pos.y, max(gameHeight / 2 - mn, 15), min(gameHeight / 2 + mn, gameHeight - 15))
+      constrain(pos.x, max(gameDisplaySize.x  / 2 - mn, 15), min(gameDisplaySize.x  / 2 + mn, gameDisplaySize.x  - 15)),
+      constrain(pos.y, max(gameDisplaySize.y / 2 - mn, 15), min(gameDisplaySize.y / 2 + mn, gameDisplaySize.y - 15))
     );
   }
-  void update() {
+  void update(float c) {
     constrainPosition(pos);
     isOutside = curX != pos.x || curY != pos.y;
+    f.size = constrain(f.size - constrain(pow(15 * (c - 0.25), 3), -100, 25) * (60 / frameRate), 500, max(gameDisplaySize.x, gameDisplaySize.y));
   }
 }
 
@@ -761,7 +764,7 @@ void setup() {
   defaultFont = createFont(sketchPath("assets/fonts/defaultFont.ttf"), 128);
   songFont    = createFont(sketchPath("assets/fonts/songFont.ttf"   ), 64 );
 
-  f = new field(max(gameWidth, gameHeight));
+  f = new field(screenSize);
   a = new arrow(gameWidth / 2, gameHeight / 2, 0, 500, 1700);
   back = createGraphics(gameWidth, gameHeight, P2D);
 
@@ -975,8 +978,7 @@ void draw() {
       previousPos.set(pos.x, pos.y);
       pos.set(curX, curY);
     
-      f.size = constrain(f.size - constrain(pow(15 * (c - 0.25), 3), -100, 25) * (60 / frameRate), 500, max(gameWidth, gameHeight));
-      f.update();
+      f.update(c);
     
       intense = f.size <= 505;
 

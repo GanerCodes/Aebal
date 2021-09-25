@@ -1,0 +1,29 @@
+//asdf
+{
+    "location": {
+        "examplePattern": {
+            "difficulty": 1,
+            "velChoices": ["exampleVel"],
+            "equation": "pow(x, 2) + pow(y, 2) - 1",
+            "countBounds": "7, 7, 7",
+            "range": 1.5,
+            "transform": [
+                {"scale"    : "1, 1"},
+                {"rotate"   : "0"   },
+                {"translate": "0, 0"}
+            ],
+            "distBounds": "1, 1, 1",
+            "scaleBounds": "1, 1, 1",
+            "modifiers": ["disableRandomRotation"]
+        }
+    },
+    "velocity": {
+        "exampleVel": {
+            "equationX": "x",
+            "equationY": "y",
+            "speedBounds": "1, 1, 1",
+            "angleSweep": "-PI, PI",
+            "modifiers": ["disableRandomRotation"]
+        }
+    }
+}

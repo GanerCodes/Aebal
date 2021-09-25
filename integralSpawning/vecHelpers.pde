@@ -9,8 +9,9 @@ PVector vec3() { return new PVector(0, 0, 0); }
 PVector mulVec(PVector vec1, PVector vec2) {
     return new PVector(vec1.x * vec2.x, vec1.y * vec2.y);
 }
-void mulVecStatic(PVector vec1, PVector vec2) {
-    return vec1.set(vec1.x * vec2.x, vec1.y * vec2.y);
+PVector mulVecStatic(PVector vec1, PVector vec2) {
+    vec1.set(vec1.x * vec2.x, vec1.y * vec2.y);
+    return vec1;
 }
 
 boolean lineIntersection(PVector a, PVector b, PVector c, PVector d) { //Yea, I wrote this, not to flex or anything 😎
@@ -24,6 +25,16 @@ float distToRect(PVector p, PVector v, PVector rectSize, PVector rectLoc) {
         abs((sgn(v.x) * (p.x - rectLoc.x) - 0.5 * rectSize.x) / v.x),
         abs((sgn(v.y) * (p.y - rectLoc.y) - 0.5 * rectSize.y) / v.y)
     );
+}
+boolean velRectIntersection(PVector p, PVector v, PVector rectSize, PVector rectLoc) {
+    return 2 * abs((p.y - rectLoc.y) - v.y / v.x * ((p.x - rectLoc.x) - 0.5 * sgn(v.x) * rectSize.x)) <= rectSize.y || 2 * abs((p.x - rectLoc.x) - v.x / v.y * ((p.y - rectLoc.y) - 0.5 * sgn(v.y) * rectSize.y)) <= rectSize.x;
+}
+boolean rayRectIntersection(PVector p, PVector v, PVector rectSize, PVector rectLoc) {
+    PVector t = PVector.add(p, PVector.mult(v, min(
+        abs(0.5 * rectSize.x - sgn(v.x) * (p.x - rectLoc.x) / v.x),
+        abs(0.5 * rectSize.y - sgn(v.y) * (p.y - rectLoc.y) / v.y)
+    )));
+    return max(abs(t.x - rectLoc.x) / rectSize.x, abs(t.y - rectLoc.y) / rectSize.y) <= 0.501;
 }
 boolean squareIntersection(PVector loc, float s, PVector a, PVector b) { //This is center aligned, for some reason
     return

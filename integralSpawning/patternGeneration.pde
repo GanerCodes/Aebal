@@ -1,3 +1,4 @@
+import java.util.Iterator;
 import net.objecthunter.exp4j.*;
 import net.objecthunter.exp4j.shuntingyard.*;
 import net.objecthunter.exp4j.tokenizer.*;
@@ -16,46 +17,88 @@ Function[] customEquationFunctions = new Function[] {
     }
 };
 
-class ChainedTransformation {
-    PVector translate, scale;
-    float rotation;
-    ChainedTransformation(PVector scale, float rotation, PVector translate) {
-        this.translate = translate;
-        this.scale = scale;
-        this.rotation = rotation;
+abstract class Transformation {
+    abstract PVector apply(PVector p);
+}
+class Translate extends Transformation {
+    PVector loc;
+    Translate(PVector loc) {
+        this.loc = loc;
     }
+    PVector apply(PVector p) {
+        p.add(loc);
+        return p;
+    }
+}
+class Scale extends Transformation {
+    PVector scale;
+    Scale(PVector scale) {
+        this.scale = scale;
+    }
+    PVector apply(PVector p) {
+        p.add(scale);
+        return p;
+    }
+}
+class Rotate extends Transformation {
+    float angle;
+    Rotate(float angle) {
+        this.angle = angle;
+    }
+    PVector apply(PVector p) {
+        p.rotate(angle);
+        return p;
+    }
+}
 
-    //static = changes in place; default is to create new vector
-    PVector applyStatic(PVector p) { return mulVecStatic(p.rotate(rotation), scale).add(translate); }
-    PVector applyScaleStatic(PVector p) { return mulVecStatic(p, scale); }
-    PVector applyRotationStatic(PVector p) { return p.rotate(rotation); }
-    PVector applyTranslationStatic(PVector p) { return p.add(translate); }
-
-    PVector apply(PVector p) { return applyStatic(p.copy()); }
-    PVector applyScale(PVector p) { return applyScaleStatic(p.copy()); }
-    PVector applyRotation(PVector p) { return applyRotationStatic(p.copy()); }
-    PVector applyTranslation(PVector p) { return applyTranslationStatic(p.copy()); }
+class ChainedTransformation {
+    ArrayList<Transformation> transformations;
+    ChainedTransformation(ArrayList<Transformation> transformations) {
+        this.transformations = transformations;
+    }
+    PVector apply(PVector p) {
+        for(Transformation t : transformations) t.apply(p);
+        return p;
+    }
+    PVector applyCopy(PVector p) {
+        apply(p = p.copy());
+        return p;
+    }
 }
 class EnemyPatternProperties {
     /**
-    pattern will be blown up by a factor of 1/4  * smallest field size
+    Order:
+        1. Run equation
+        2. Apply the things under "transform"
+        3. At this point, calculate the velocity
+        4. If enabled in the pattern, apply random rotation
+        5. Apply random modifications at this point
+        6. Blow up location pattern (factor of 1/4 * min field size), then translate to middle
+
     song intensity will probs just divide the song intensity by some constant. Maybe some nonlinear properties towards the end to make hard and impossible actually be close to it's title 
-    if a bound is in reverse order, it is applied as such, so that it varies in the opposite way you would expect to the song intensity
     if a bound only has one value, then both bounds are set to that value.
+    if a bound is in reverse order, it is applied as such, so that it varies in the opposite way you would expect to the song intensity
     Velocity equations can use x, y, and time. If the location is defined implicity, then the angle from (translated) origin will be used.
     speed is anticipated to be around 1
-    count is anticipated to not be stupid. Mental reminder to keep it in float form until it's time to itterate so that bounds and stuff work right
+    Mental reminder to keep count in float form until it's time to itterate so that bounds and stuff work right
+    
+    //The relationship for song dependant bounding and song intensity would something like this:
+    //    song intensity under average: lerp(min, default, intensity / average)
+    //    song intensity after average: lerp(default, max, m)
+    //        m = nonlinear function that starts slowish and increases faster as it goes along, based on song intensity ranging from average to some high relevent value; output is between 0 and 1, obviously
 
-    difficulty              - [0] - a order number rather than value [so having enemies 1 & 2 have difficulty 1 & 2 isn't diffrent from difficulty 1 & 500], basically higher value = less likely to spawn / will spawn more likely on higher song intensity. This is also applied when picking a velocity pattern from the list
-    disableRandomRotation   - [false] - distance randomized rotation
-    defaultCount            - [implicit: 4, parametric: 16] - standard number of enemies [note, on implicit equations it represents the step count in both the x and y directions, basically sqrt() the expected count]
-    countBounds             - [implicit: (3, 5), parametric: (7, 25)] - enemy count range, depends mostly on current song intensity
-    distBounds              - [0.2, 0.8] - distance range to add to starting [after default translate value] location (1.0 is gameHeight (without margins ofc) / 2)
-    defaultSpeed            - [midpoint of speedBounds] - default multiplier applied to velocity
-    speedBounds             - [0.5, 1.5; defaultSpeed / 2, defaultSpeed * 2 if available] speed range, depends mostly on current song intensity
-    scaleBounds             - [0.5, 1.5] scale multiplier range, depends mostly on current song intensity, applied after default scale adjustments but before rotation and translate [obviously]
-    range                   - [1; only applies to implicit equation] graph scaling factor; 1 yeilds analyzing the equation from -1 to 1 on both the X and Y directions, while 2 would be -2 to 2. Mental note: use lerp again and keep origional ordering xd
-    angleSweep              - [-PI, PI; only applies to parametric] - the values t will range from; mental note: keep order as is, use lerp to calculate t, making sure that both endpoints are included.
+    [ LV | IP |   ] difficulty              - 0                                                             - a order number rather than value [so having enemies 1 & 2 have difficulty 1 & 2 isn't diffrent from difficulty 1 & 500], basically higher value = less likely to spawn / will spawn more likely on higher song intensity. This is also applied when picking a velocity pattern from the list
+    [ LV | IP |   ] disableRandomRotation   - false                                                         - disable randomized rotation
+    [  V | IP ]   ] disableRotationStacking - false                                                         - prevents random rotation of spawn pattern [if enabled] from alterning the velocity spawning
+    [ L  | IP |   ] defaultCount            - I: 4; P: 16                                                   - standard number of enemies [note, on implicit equations it represents the step count in both the x and y directions, basically sqrt() the expected count]
+    [ L  | IP | * ] countBounds             - I: (3, 5); P: (7, 25)                                         - enemy count range, depends mostly on current song intensity
+    [ LV | IP | * ] distBounds              - (0.2, 0.8)                                                    - distance range to add to starting [after default translate value] location (Location: 1.0 is gameHeight (no margins) / 2 , Velocity: 1.0 is 1.0)
+    [  V |  P | * ] speedBounds             - (0.5, 1.5); (defaultSpeed / 2, defaultSpeed * 2) if available - speed range, depends mostly on current song intensity
+    [ LV | IP | * ] scaleBounds             - (0.5, 1.5)                                                    - scale multiplier range, depends mostly on current song intensity, applied after default scale adjustments but before rotation and translate [obviously]
+    [ LV | IP |   ] defaultScale            - 1                                                             - default scale multiplier
+    [  V |  P |   ] defaultSpeed            - MidPoint of speedBounds                                       - default multiplier applied to velocity
+    [ L  | I  |   ] range                   - 1                                                             - graph scaling factor; 1 yeilds analyzing the equation from -1 to 1 on both the X and Y directions, while 2 would be -2 to 2. Mental note: use lerp again and keep origional ordering xd
+    [ LV |  P |   ] angleSweep              - -PI, PI                                                       - the values t will range from; mental note: keep order as is, use lerp to calculate t, making sure that both endpoints are included.
     
     "locPatterns": {
         "examplePattern": {
@@ -71,8 +114,6 @@ class EnemyPatternProperties {
             defaultCount: 5,
             countBounds: "4, 6",
             distBounds: "0.5, 1",
-            defaultSpeed: "1",
-            speedBounds: [0.8, 1.5]
             scaleBounds: [0.5, 2]
             modifiers: ["disableRandomRotation", ...],
         }
@@ -81,18 +122,15 @@ class EnemyPatternProperties {
         "examplevelPatternhaha": {
             equationX: "x + t + y",
             equationY: "max(2, y / x * sin(x))",
-            angleSweep: "0, 1"
+            defaultSpeed: "1",
+            speedBounds: [0.8, 1.5],
+            angleSweep: "0, 1",
+            modifiers: ["disableRandomRotation", "disableRotationStacking"],
         }
     }
-
-
-    The relationship for song dependant bounding and song intensity would something like this:
-        song intensity under average: lerp(min, default, intensity / average)
-        song intensity after average: lerp(default, max, m)
-            m = nonlinear function that starts slowish and increases faster as it goes along, based on song intensity ranging from average to some high relevent value; output is between 0 and 1, obviously
     **/
-    float difficulty, defaultCount, defaultSpeed, range;
-    boolean allowRandomRotation, disableVelocityRotation;
+    float difficulty, range;
+    boolean disableRandomRotation, disableRotationStacking;
     PVector distBounds, speedBounds, countBounds, scaleBounds, angleSweep;
     ChainedTransformation defaultTransformation;
     EnemyPatternProperties(float difficulty, ChainedTransformation defaultTransformation) {
@@ -120,189 +158,254 @@ class Equation {
         return ID + ": " + equationPrintable;
     }
 }
-class Equation1D extends Equation {
+class Equation1D extends Equation { //1 output dimension; implicit equation
     String equationStr;
     Expression equation;
     Equation1D(String ID, String[] relatedEquationNames, EnemyPatternProperties spawnProperties, String eq) {
         super(IMPLICIT, ID, relatedEquationNames, eq, spawnProperties);
         equation = new ExpressionBuilder(eq).functions(customEquationFunctions).variables("x", "y").build();
-        this.range = range;
     }
-    float getValAtLoc(float x, float y) {
-        return (float)equation.setVariable("x", x).setVariable("y", y).evaluate();
+    float getVal(float x, float y, float t) {
+        return (float)equation.setVariable("x", x).setVariable("y", y).setVariable("t", t).evaluate();
     }
 }
-class Equation2D extends Equation {
+class Equation2D extends Equation { //2 output dimensions; parametric equation
     String equationXStr, equationYStr;
-    float rangeStart, rangeEnd;
     Expression equationX, equationY;
-    Equation2D(String ID, String[] relatedEquationNames, EnemyPatternProperties spawnProperties, String eqX, String eqY, float rangeStart, float rangeEnd) {
+    Equation2D(String ID, String[] relatedEquationNames, EnemyPatternProperties spawnProperties, String eqX, String eqY) {
         super(PARAMETRIC, ID, relatedEquationNames, String.format("[%s, %s]", eqX, eqY), spawnProperties);
         equationX = new ExpressionBuilder(eqX).functions(customEquationFunctions).variables("x", "y", "t").build();
         equationY = new ExpressionBuilder(eqY).functions(customEquationFunctions).variables("x", "y", "t").build();
-        this.rangeStart = rangeStart;
-        this.rangeEnd = rangeEnd;
     }
-    PVector getValAtLoc(float x, float y, float t) {
+    PVector getVal(float x, float y, float t) {
         return new PVector(
             (float)equationX.setVariable("x", x).setVariable("y", y).setVariable("t", t).evaluate(),
             (float)equationY.setVariable("x", x).setVariable("y", y).setVariable("t", t).evaluate()
         );
     }
 }
-class SpawnPatterns {
+class EquationDifficultySorter implements Comparator<Equation> {
+    @Override
+    int compare(Equation a, Equation b) {
+        return Float.compare(a.spawnProperties.difficulty, b.spawnProperties.difficulty);
+    }
+}
+
+class PatternSpawner {
     ArrayList<Equation> locations;
     ArrayList<Equation2D> velocities;
-    HashMap<String, Equation2D> VelIDMapping;
+    HashMap<String, Equation>   locIDMapping;
+    HashMap<String, Equation2D> velIDMapping;
     HashMap<String, ArrayList<Equation2D>> locIDVelMapping;
 
-    SpawnPatterns(ArrayList<Equation> locations, ArrayList<Equation2D> velocities) {
+    PatternSpawner(String filename) {
+        ArrayList<Equation>   locations  = new ArrayList();
+        ArrayList<Equation2D> velocities = new ArrayList();
+
+        String jsonString = "";
+        for(String s : loadStrings(filename)) {
+            String t = trim(s);
+            if(!(t.charAt(0) == '/' && t.charAt(1) == '/')) jsonString += s + '\n';
+        }
+
+        JSONObject json = parseJSONObject(jsonString);
+        JSONObject locationPatterns = json.getJSONObject("location");
+        JSONObject velocityPatterns = json.getJSONObject("velocity");
+
+        for(Object key : locationPatterns.keys()) {
+            String k = (String)key;
+            locations .add(            parsePattern(locationPatterns.getJSONObject(k), k, false));
+        }
+        for(Object key : velocityPatterns.keys()) {
+            String k = (String)key;
+            velocities.add((Equation2D)parsePattern(velocityPatterns.getJSONObject(k), k, true ));
+        }
+
+        init(locations, velocities);
+    }
+
+    Equation parsePattern(JSONObject pattern, String ID, boolean isVelocityPattern) {        
+        int equationType;
+
+        float difficulty = jsonVal(pattern, "difficulty", 0);
+        String[] relatedEquationNames;
+        if(!isVelocityPattern) relatedEquationNames = pattern.getJSONArray("velChoices").getStringArray();
+        
+        String equation, equationX, equationY;
+        if(pattern.isNull("equation")) {
+            equationType = Equation.PARAMETRIC;
+            if(pattern.isNull("equationX") || pattern.isNull("equationY")) {
+                throw new Exception("Pattern Parsing Error: Could not find equation");
+            }
+            equationX = pattern.getString("equationX");
+            equationY = pattern.getString("equationY");
+        }else{
+            equationType = Equation.IMPLICIT;
+            if(isVelocityPattern) throw new Exception("Pattern Parsing Error: Implicit equation used for velocity");
+            equation = pattern.getString("equation");
+        }
+
+        ChainedTransformation transformations = new ChainedTransformation(new ArrayList());
+        EnemyPatternProperties properties = new EnemyPatternProperties(difficulty, transformations);
+        Equation equation;
+        if(equationType == Equation.PARAMETRIC) {
+            equation = new Equation2D(ID, relatedEquationNames, properties, equationX, equationY);
+        }else{
+            equation = new Equation1D(ID, relatedEquationNames, properties, equation);
+        }
+
+        if(isVelocityPattern) {
+            properties.speedBounds = defaultParse(pattern, "speedBounds", vec3(1));
+            properties.angleSweep = defaultParse2D(pattern, "angleSweep", vec2(-PI, PI));
+        }else{
+            properties.countBounds = defaultParse(pattern, "countBounds", equationType == Equation.PARAMETRIC ? vec3(25) : vec3(5));
+            
+        }
+        properties. distBounds = defaultParse(pattern, "distBounds" , vec3(0));
+        properties.scaleBounds = defaultParse(pattern, "scaleBounds", vec3(1));
+
+
+        //distBounds, speedBounds, countBounds, scaleBounds, angleSweep;
+
+        return new Equation(0, null, null, null, null);
+    }
+    
+    PVector defaultParse(JSONObject json, String s, PVector alternate) {
+        return json.isNull(s) ? alternate : parseBounds(json.getString(s));
+    }
+    PVector parseBounds(String s) {
+        String[] spl = split(s, ',');
+        float[] vals = new floats[spl.length];
+        for(int i = 0; i < vals.length; i++) {
+            vals[i] = float(trim(spl[i]));
+        }
+        if(vals.length == 1) return new PVector(vals[0], vals[0]                , vals[0]);
+        if(vals.length == 2) return new PVector(vals[0], (vals[0] + vals[1]) / 2, vals[1]);
+        if(vals.length >= 3) return new PVector(vals[0], vals[1]                , vals[2]);
+        throw new Exception("Pattern Parsing Error: Couldn't parse bounds");
+    }
+    PVector defaultParse2D(JSONObject json, String s, PVector alternate) {
+        return json.isNull(s) ? alternate : parseBounds2D(json.getString(s));
+    }
+    PVector parseBounds2D(String s) {
+        String[] spl = split(s, ',');
+        if(spl.length < 2) throw new Exception("Pattern Parsing Error: Couldn't parse bounds");
+        return new PVector(
+            float(trim(spl[0]).toLowerCase().replace("pi", -PI)),
+            float(trim(spl[1]).toLowerCase().replace("pi",  PI))
+        );
+    }
+    
+
+    void init(ArrayList<Equation> locations, ArrayList<Equation2D> velocities) {
         this.locations = locations;
         this.velocities = velocities;
 
-        VelIDMapping = new HashMap<String, Equation2D>();
-        for(Equation2D velEquation : velocities) VelIDMapping.put(velEquation.ID, velEquation);
+        locations.sort(new EquationDifficultySorter());
 
-        locVelPatternMapping = new HashMap<String, ArrayList<Equation2D>>();
+        velIDMapping = new HashMap<String, Equation2D>();
+        locIDMapping = new HashMap<String, Equation  >();
+        for(Equation2D velEquation : velocities) velIDMapping.put(velEquation.ID, velEquation);
+
+        locIDVelMapping = new HashMap<String, ArrayList<Equation2D>>();
         for(Equation locEquation : locations) {
+            locIDMapping.put(locEquation.ID, locEquation);
             ArrayList<Equation2D> complementVelocities = new ArrayList();
-            for(String velName : locEquation.relatedEquationNames) complementVelocities.add(VelIDMapping.get(velName));
-            locVelPatternMapping.put(locEquation.ID, complementVelocities);
+            for(String velName : locEquation.relatedEquationNames) complementVelocities.add(velIDMapping.get(velName));
+            complementVelocities.sort(new EquationDifficultySorter());
+            locIDVelMapping.put(locEquation.ID, complementVelocities);
         }
     }
-    void adjustEnemy(PVector loc, PVector vel) {
-        loc = loc;
-        vel = vel;
+
+    ArrayList<Enemy> spawnPattern(GameMap gameMap, RNG rng, float time, float intensity, float difficulty) {
+        //intensity needs to range from 0 to around 1
+        //difficulty ranges from 0.1 to 1.0; 0.1 = nearly zero chance of hard pattern; 1.0 = every pattern is the same 
+        Equation spawnLocEq = locations.get(int(locations.size() * getWeighedRandom(rng, intensity, difficulty)));
+        ArrayList<Equation2D> velEquationChoices = locIDVelMapping.get(spawnLocEq.ID);
+        Equation2D spawnVelEq = velEquationChoices.get(int(velEquationChoices.size() * getWeighedRandom(rng, intensity, difficulty)));
+        return generatePattern(spawnLocEq, spawnVelEq, gameMap, rng, time, getWeighedRandom(rng, intensity, difficulty));
     }
-    void spawnLocVel(Equation location, Equation2D velocity, RNG rng, float time) {
-        if(location.type == Equation.PARAMETRIC) {
-            Equation1D parametricEquation = (Equation1D)location;
-        }else if(location.type == Equation.IMPLICIT) {
-            Equation2D implicitEquation = (Equation2D)location;
+    ArrayList<Enemy> spawnPattern(GameMap gameMap, String locEqName, String velEqName, RNG rng, float time, float intensity, float difficulty) {
+        return generatePattern(locIDMapping.get(locEqName), (Equation2D)locIDMapping.get(velEqName), gameMap, rng, time, getWeighedRandom(rng, intensity, difficulty));
+    }
+
+    float getWeighedRandom(RNG rng, float intensity, float difficulty) {
+        return 1 - pow(rng.rand(), intensity * difficulty);
+    }
+
+    ArrayList<Enemy> generatePattern(Equation locEq, Equation2D velEq, GameMap gameMap, RNG rng, float time, float iLerp) {
+        EnemyPatternProperties locationProps = locEq.spawnProperties;
+        EnemyPatternProperties velocityProps = velEq.spawnProperties;
+        ArrayList<PVector> locs = new ArrayList();
+        ArrayList<PVector> vels = new ArrayList();
+        
+        int   count      = round(lerpCentered(locationProps.countBounds, iLerp)); //defaultCount
+        float speed      =       lerpCentered(velocityProps.speedBounds, iLerp);  //defaultSpeed
+        float locScale   =       lerpCentered(locationProps.scaleBounds, iLerp);  //defaultScale
+        float velScale   =       lerpCentered(velocityProps.scaleBounds, iLerp);  //defaultScale
+        float locDistAdj =       lerpCentered(locationProps.distBounds , rng.random()) * gameMap.gameDisplaySize.y;
+
+        float locDistAdjRotation = rng.randCentered(PI);
+        float locRotation = rng.randCentered(PI);
+        float velRotation = rng.randCentered(PI);
+
+        if(locEq.type == Equation.PARAMETRIC) {
+            Equation2D parEq = (Equation2D)locEq;
+            for(int i = 0; i < count; i++) {
+                float t = map(i, 0, count - 1, locationProps.angleSweep);
+                PVector loc = locationProps.defaultTransformation.apply(parEq.getVal(0, 0, t));
+                locs.add(loc);
+                vels.add(velocityProps.defaultTransformation.apply(velEq.getVal(loc.x, loc.y, t)));
+            }
+        }else if(locEq.type == Equation.IMPLICIT) {
+            Equation1D impEq = (Equation1D)locEq;
+            for(int i = 0; i < count; i++) {
+                float x = map(i, 0, count - 1, -locationProps.range, locationProps.range);
+                for(int o = 0; o < count; o++) {
+                    float y = map(o, 0, count - 1, -locationProps.range, locationProps.range);
+                    if(impEq.getVal(x, y, atan2(y, x)) > 0) continue;
+                    PVector loc = locationProps.defaultTransformation.apply(new PVector(x, y));
+                    locs.add(loc);
+                    vels.add(velocityProps.defaultTransformation.apply(velEq.getVal(loc.x, loc.y, loc.heading()))); //im just gonna assume .heading will work
+                }
+            }
         }
-    }
-    void spawnPattern(GameMap gameMap, float difficulty, RNG rng, float time) {
-        Equation spawnEquation = Equationlocations.get((int)rng.rand(locations.size()));
-        ArrayList<Equation2D> spawnOptions = locIDVelMapping.get(spawnEquation.ID);
-        Equation2D spawnVelocity = spawnOptions.get((int)rng.rand(spawnOptions.size()));
-        spawnLocVel(spawnEquation, spawnVelocity, time);
-    }
-}
-
-/*
-class expressionLocPair {
-    Expression x, y;
-    float countDiv = 1, speedDiv = 1, scaleDiv = 1;
-    String equation;
-    expressionLocPair(Expression x, Expression y) {
-        this.x = x;
-        this.y = y;
-    }
-    void setDivs(float speedDiv, float countDiv, float scaleDiv) {
-        this.speedDiv = speedDiv;
-        this.countDiv = countDiv;
-        this.scaleDiv = scaleDiv;
-    }
-}
-
-float multiplyLenient(float a, float b) {
-    return a > 0 && b > 0 ? a * b - abs((a - b) / (a + b)) : a * b;
-}
-void addExpression(ArrayList<expressionLocPair> exList, String eqX, String eqY, float speedDiv, float countDiv, float scaleDiv, char mode) {
-    expressionLocPair newExp = (mode == 'p') ? new expressionLocPair(
-        new ExpressionBuilder(eqX).functions(minEq, maxEq).variables("t").build(),
-        new ExpressionBuilder(eqY).functions(minEq, maxEq).variables("t").build()
-    ) : new expressionLocPair(
-        new ExpressionBuilder(eqX).functions(minEq, maxEq).variables("x", "y").build(),
-        new ExpressionBuilder(eqY).functions(minEq, maxEq).variables("x", "y").build()
-    );
-    
-    newExp.setDivs(speedDiv, countDiv, scaleDiv);
-    newExp.equation = "("+eqX+", "+eqY+")";
-    exList.add(newExp);
-}
-PVector getLoc(expressionLocPair eq, float t) {
-    return new PVector(
-        (float)eq.x.setVariable("t", t).evaluate(),
-        (float)eq.y.setVariable("t", t).evaluate()
-    );
-}
-PVector getVel(expressionLocPair eq, PVector loc) {
-    return new PVector(
-        (float)eq.x.setVariable("x", loc.x).setVariable("y", loc.y).evaluate(),
-        (float)eq.y.setVariable("x", loc.x).setVariable("y", loc.y).evaluate()
-    );
-}
-PVector getVel(expressionLocPair eq, float x, float y) {
-    return getVel(eq, new PVector(x, y));
-}
-boolean verifyObjSpawn(PVector loc, PVector vel, PVector playSize, PVector startLoc, float timeEnd) {
-    PVector screenLoc  = new PVector(0, 0);
-    PVector endLoc     = PVector.add(loc, PVector.mult(vel, timeEnd));
-
-    return !inBounds(startLoc, screenLoc, playSize) && !inBounds(endLoc, screenLoc, playSize) && rectIntersection(screenLoc, playSize, startLoc, endLoc);
-}
-ArrayList<obj> makeObjectGroup(expressionLocPair locEq, expressionLocPair velEq, int objCount, float minTime, float maxTime, float speedMult, float scaleMult, float ang, PVector playArea, PVector objTranslate) {
-    ArrayList<obj> group = new ArrayList();
-    PVector center = PVector.div(playArea, 2.0);
-    
-    float speedDiv = multiplyLenient(locEq.speedDiv, velEq.speedDiv);
-    float countDiv = multiplyLenient(locEq.countDiv, velEq.countDiv);
-    float scaleDiv = multiplyLenient(locEq.scaleDiv, velEq.scaleDiv);
-
-    speedMult /= abs(speedDiv);
-    objCount = max(1, int(objCount / countDiv));
-    scaleMult /= scaleDiv;
-
-    float step = TWO_PI / objCount;
-    for(int i = 0; i < objCount; i++) {
-        float t = i * step;
-        PVector loc = getLoc(locEq, t  );
-        PVector vel = getVel(velEq, loc).mult(speedMult);
-        loc.mult(scaleMult).add(objTranslate).add(center);
-        PVector startLoc = PVector.add(loc, PVector.mult(vel, minTime));
-        if(verifyObjSpawn(loc, vel, playArea, startLoc, maxTime)) {
-            group.add(new obj(startLoc, vel));
+        
+        for(int i = 0; i < locs.size(); i++) {
+            PVector loc = locs.get(i).mult(locScale);
+            PVector vel = vels.get(i).mult(velScale);
+            
+            if(!locationProps.disableRandomRotation) {
+                loc.rotate(locRotation);
+                if(!velocityProps.disableRotationStacking) {
+                    vel.rotate(locRotation);
+                }
+            }
+            if(!velocityProps.disableRandomRotation) vel.rotate(velRotation);
+            vel.mult(speed);
         }
-    }
-    return group;
-}
-ArrayList<obj> getRandomGroup(ArrayList<expressionLocPair> locExpressions, ArrayList<expressionLocPair> velExpressions, PVector screenSize, RNG rng, int count, float sizeDiv, float speedDiv) {
-    float baseSize = 3.0;
 
-    float speedProp = 22.5 / 1000;
-    float speedScaleFactor = speedProp * float(width) / (baseSize * speedDiv);
-    float finalSize = random(200, 425) / (baseSize * sizeDiv);
-
-    expressionLocPair locExp = locExpressions.get((int)rng.random(locExpressions.size()));
-    expressionLocPair velExp = velExpressions.get((int)rng.random(velExpressions.size()));
-    logmsg(String.format("Parametric Spawn: [%s, %s]", locExp.equation, velExp.equation));
-    return makeObjectGroup(
-        locExp, velExp, count, -10 / speedProp, 15 / speedProp, speedScaleFactor, finalSize, rng.randBool() ? rng.randomC(PI) : (rng.randBool() ? 0 : PI), screenSize,
-        new PVector(
-            rng.random(-1.0 / 6.5 * screenSize.x, 1.0 / 6.5 * screenSize.x),
-            rng.random(-1.0 / 6.5 * screenSize.y, 1.0 / 6.5 * screenSize.y)
-        )
-    );
-}
-
-void loadPatternFile(String patternFileName, ArrayList locExpressions, ArrayList velExpressions) {
-    if(locExpressions == null) locExpressions = new ArrayList();
-    if(velExpressions == null) velExpressions = new ArrayList();
-    String[] patternFile = loadStrings(patternFileName);
-    for(String s : patternFile) {
-        s = trim(split(s, "#")[0]);
-        if(s.length() < 3 || s.charAt(0) == '#') continue;
-        String[] spl = split(s.substring(2), "|");
-        for(int i = 0; i < spl.length; i++) {
-            spl[i] = trim(spl[i]);
+        ArrayList<Enemy> enemies = new ArrayList();
+        for(int i = 0; i < locs.size(); i++) {
+            PVector loc = locs.get(i);
+            PVector vel = vels.get(i);
+            if(vel.mag() <= 0.01) {
+                println(String.format("Enemy ([%s, %s], [%s, %s]) was excluded for having low or zero velocity.", loc.x, loc.y, vel.x, vel.y));
+                continue;
+            }
+            //todo: add field to songmap and have default location multiplier be min fieldsize / 3
+            loc.mult(height / 3).add(gameMap.gameCenter).add(PVector.fromAngle(locDistAdjRotation).mult(locDistAdj));
+            if(!velRectIntersection(loc, vel, gameMap.gameSize, gameMap.gameCenter)) {
+                println(String.format("Enemy ([%s, %s], [%s, %s]) was excluded for having no intersection with play area.", loc.x, loc.y, vel.x, vel.y));
+                continue;
+            }
+            Enemy newEnemy = gameMap.createEnemy(loc, vel, time);
+            if(newEnemy.spawnTime < 0) {
+                println(String.format("Enemy (%s) was excluded for being on screen at song start.", newEnemy));
+                continue;
+            }
+            enemies.add(newEnemy);
         }
-        boolean isParametric = s.substring(0, 2).equals("L:");
-        addExpression(isParametric ? locExpressions : velExpressions, spl[0], spl[1], 
-            spl.length > 2 && spl[2].length() > 0 ? float(spl[2]) : 1, 
-            spl.length > 3 && spl[3].length() > 0 ? float(spl[3]) : 1, 
-            spl.length > 4 && spl[4].length() > 0 ? float(spl[4]) : 1, 
-            isParametric ? 'p' : 'i'
-        );
-    }
-}*/
+        return enemies;
+    }   
+}

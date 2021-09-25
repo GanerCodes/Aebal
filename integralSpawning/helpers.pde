@@ -37,18 +37,22 @@ class RNG {
         randomizeSeed();
     }
 
-    float r(float a, float b)      { return lerp(a, b, RNG.nextFloat()); }
-    float r(float x)               { return x * RNG.nextFloat(); }
     float r()                      { return RNG.nextFloat(); }
-    float rng(float a, float b)    { return r(a, b);      }
-    float rng(float x)             { return r(x);         }
-    float rng()                    { return r();          }
-    float rand(float a, float b)   { return r(a, b);      }
-    float rand(float x)            { return r(x);         }
-    float rand()                   { return r();          }
-    float random(float a, float b) { return r(a, b);      }
-    float random(float x)          { return r(x);         }
-    float random()                 { return r();          }
+    float r(float a, float b)      { return lerp(a, b, r()); }
+    float r(float x)               { return r() * x;         }
+    float r(PVector p)             { return r(p.x, p.y);     }
+    float rng()                    { return r();             }
+    float rng(float a, float b)    { return r(a, b);         }
+    float rng(float x)             { return r(x);            }
+    float rng(PVector p)           { return r(p);            }
+    float rand()                   { return r();             }
+    float rand(float a, float b)   { return r(a, b);         }
+    float rand(float x)            { return r(x);            }
+    float rand(PVector p)          { return r(p);            }
+    float random()                 { return r();             }
+    float random(float a, float b) { return r(a, b);         }
+    float random(float x)          { return r(x);            }
+    float random(PVector p)        { return r(p);            }
 
     float rC(float x)             { return r(-x, x); }
     float rngC(float x)           { return rC(x);    }
@@ -149,21 +153,79 @@ boolean NLTGT (int   a, int   b, int   c) { return a >  c || a <  b; }
 boolean NGTLTE(int   a, int   b, int   c) { return a <= b || a >= c; }
 boolean NLTGTE(int   a, int   b, int   c) { return a >= c || a <= b; }
 
-float multiplyLenient(float a, float b) {
-    return a > 0 && b > 0 ? a * b - abs((a - b) / (a + b)) : a * b;
+float map(float v, PVector r1, PVector r2) {
+    return map(v, r1.x, r1.y, r2.x, r2.y);
+}
+float map(float v, PVector r1, float r2_min, float r2_max) {
+    return map(v, r1.x, r1.y, r2_min, r2_max);
+}
+float map(float v, float r1_min, float r1_max, PVector r2) {
+    return map(v, r1_min, r1_max, r2.x, r2.y);
 }
 
 float cNorm(float a, float b, float c) {
     return constrain(norm(a, b, c), 0, 1);
 }
-float clamp(float x, float a, float b) {
-    return constrain(x, min(a, b), max(a, b));
+float cNorm(float v, PVector range) {
+    return cNorm(v, range.x, range.y);
 }
-float clampMap(float x, float r1_min, float r1_max, float r2_min, float r2_max) {
-    return clamp(map(x, r1_min, r1_max, r2_min, r2_max), r2_min, r2_max);
+
+float clamp(float v, float a, float b) {
+    return constrain(v, min(a, b), max(a, b));
 }
-float constrainMap(float x, float r1_min, float r1_max, float r2_min, float r2_max) {
-    return constrain(map(x, r1_min, r1_max, r2_min, r2_max), r2_min, r2_max);
+float clamp(float v, PVector range) {
+    return clamp(v, range.x, range.y);
+}
+
+float clampMap(float v, float r1_min, float r1_max, float r2_min, float r2_max) {
+    return clamp(map(v, r1_min, r1_max, r2_min, r2_max), r2_min, r2_max);
+}
+float clampMap(float v, PVector r1, PVector r2) {
+    return clampMap(v, r1.x, r1.y, r2.x, r2.y);
+}
+float clampMap(float v, PVector r1, float r2_min, float r2_max) {
+    return clampMap(v, r1.x, r1.y, r2_min, r2_max);
+}
+float clampMap(float v, float r1_min, float r1_max, PVector r2) {
+    return clampMap(v, r1_min, r1_max, r2.x, r2.y);
+}
+
+float constrainMap(float v, float r1_min, float r1_max, float r2_min, float r2_max) {
+    return constrain(map(v, r1_min, r1_max, r2_min, r2_max), r2_min, r2_max);
+}
+float constrainMap(float v, PVector r1, PVector r2) {
+    return constrain(map(v, r1.x, r1.y, r2.x, r2.y), r2.x, r2.y);
+}
+float constrainMap(float v, float r1_min, float r1_max, PVector r2) {
+    return constrain(map(v, r1_min, r1_max, r2.x, r2.y), r2.x, r2.y);
+}
+float constrainMap(float v, PVector r1, float r2_min, float r2_max) {
+    return constrain(map(v, r1.x, r1.y, r2_min, r2_max), r2_min, r2_max);
+}
+
+//Why do lerp and norm have diffrent orderings
+float norm(float v, PVector range) {
+    return norm(v, range.x, range.y);
+}
+float lerp(PVector range, float val) {
+    return lerp(range.x, range.y, val);
+}
+float lerp(float val, PVector range) {
+    return lerp(range.x, range.y, val);
+}
+float lerpCentered(PVector range, float val) {
+    if(val < 0.5) {
+        return lerp(range.x, range.y, val * 2);
+    }else{
+        return lerp(range.y, range.z, val * 2 - 1);
+    }
+}
+float lerpCentered(float val, PVector range) {
+    return lerpCentered(range, val);
+}
+
+float multiplyLenient(float a, float b) {
+    return a > 0 && b > 0 ? a * b - abs((a - b) / (a + b)) : a * b;
 }
 
 color mulColor(color c, PVector v) {
@@ -173,4 +235,14 @@ color lerpColors(float v, color... colors) {
     v *= 0.9999 * (colors.length - 1);
     int indx = constrain(int(v), 0, colors.length - 2);
     return lerpColor(colors[indx], colors[indx + 1], v % 1.0);
+}
+
+float   jsonVal(JSONObject json, String key, float   alternate) {
+    return json.isNull(key) ? alternate : json.getFloat  (key);
+}
+String  jsonVal(JSONObject json, String key, String  alternate) {
+    return json.isNull(key) ? alternate : json.getString (key);
+}
+boolean jsonVal(JSONObject json, String key, boolean alternate) {
+    return json.isNull(key) ? alternate : json.getBoolean(key);
 }

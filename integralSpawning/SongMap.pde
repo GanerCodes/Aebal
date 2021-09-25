@@ -32,10 +32,10 @@ class GameMap {
     Enemy[] enemySpawns;
     ArrayList<Enemy> enemies;
     AudioPlayer song;
-    PVector gameSize, gameCenter;
+    PVector gameDisplaySize, gameSize, gameCenter;
 
     class enemySpawnTimeSorter implements Comparator<Enemy> {
-    @Override
+        @Override
         int compare(Enemy a, Enemy b) {
             return Float.compare(a.spawnTime, b.spawnTime);
         }
@@ -43,7 +43,8 @@ class GameMap {
 
     void init(PVector gameSize) {
         this.marginSize = GAME_MARGIN_SIZE;
-        this.gameSize = PVector.add(gameSize, new PVector(marginSize * 2, marginSize * 2));
+        this.gameDisplaySize = gameSize.copy();
+        this.gameSize = PVector.add(gameSize, vec2(marginSize * 2));
         this.gameCenter = PVector.mult(gameSize, 0.5);
         SPS = SAMPLES_PER_SECOND;
         dt = 1.0 / SPS;
@@ -133,6 +134,28 @@ class GameMap {
 
         generateIntegral(generateVels(), gameSize);
 
+        // EnemyPatternProperties locPtest = new EnemyPatternProperties(0, new ChainedTransformation(new ArrayList<Transformation>()));
+        // EnemyPatternProperties velPtest = new EnemyPatternProperties(0, new ChainedTransformation(new ArrayList<Transformation>()));
+        // Equation1D loctest = new Equation1D("l", new String[] {"v"}, locPtest, "abs(y + abs(x)) + abs(x) - 1");
+        // Equation2D veltest = new Equation2D("v", new String[] {}, velPtest, "-x", "y");
+        // ArrayList<Equation> locEtest = new ArrayList();
+        // ArrayList<Equation2D> velEtest = new ArrayList();
+        // locPtest.range = 1;
+        // locPtest.defaultCount = 10;
+        // locPtest.distBounds  = vec2(0);
+        // locPtest.countBounds = vec2(50);
+        // locPtest.scaleBounds = vec2(1);
+
+        // velPtest.defaultSpeed = 5;
+        // velPtest.distBounds  = vec2(0);
+        // velPtest.speedBounds = vec2(5);
+        // velPtest.scaleBounds = vec2(1);
+        // velPtest.angleSweep  = vec2(-PI, PI);
+        // velPtest.disableRandomRotation = true;
+        // locEtest.add(loctest);
+        // velEtest.add(veltest);
+        // enemies.addAll(new PatternSpawner(locEtest, velEtest).spawnPattern(this, new RNG(), 10, 1, 1));
+
         { //Beat detection
             //iSec / 9 - Defines the smallest duration between a beat pattern as 1s / x
             int minSeg = iSec / 2;
@@ -173,7 +196,7 @@ class GameMap {
                                         if(marker) continue;
 
                                         enemies.add(
-                                            makeAlteredEnemy(
+                                            createEnemy(
                                                 new PVector(width - 1, height / 2),
                                                 new PVector(10, 0),
                                                 sampSecFactor * beatTime
@@ -265,7 +288,7 @@ class GameMap {
         }
         return -1;
     }
-    Enemy makeAlteredEnemy(PVector loc, PVector vel, float time) {
+    Enemy createEnemy(PVector loc, PVector vel, float time) {
         float currentTime = time * SPS;
         float currentVal = getIntegralVal(currentTime);
 
