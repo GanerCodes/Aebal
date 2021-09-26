@@ -156,6 +156,8 @@ class GameMap {
         // velEtest.add(veltest);
         // enemies.addAll(new PatternSpawner(locEtest, velEtest).spawnPattern(this, new RNG(), 10, 1, 1));
 
+        enemies.addAll(new PatternSpawner("patterns.json").spawnPattern(this, new RNG(), 10, 1, 1));
+
         { //Beat detection
             //iSec / 9 - Defines the smallest duration between a beat pattern as 1s / x
             int minSeg = iSec / 2;

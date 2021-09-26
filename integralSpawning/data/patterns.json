@@ -1,19 +1,20 @@
-//asdf
+// Note if you're in VSCode you should set JSON's file association to "jsonc" to get rid of squiggles, this isn't actually jsonc just lines that start with (excluding whitespace) "//" are removed
+
 {
     "location": {
         "examplePattern": {
             "difficulty": 1,
             "velChoices": ["exampleVel"],
-            "equation": "pow(x, 2) + pow(y, 2) - 1",
-            "countBounds": "7, 7, 7",
-            "range": 1.5,
+            "equation": "abs(y + abs(x)) + abs(x) - 1",
+            "countBounds": "20",
+            "range": 1,
             "transform": [
-                {"scale"    : "1, 1"},
-                {"rotate"   : "0"   },
-                {"translate": "0, 0"}
+                {"scale"    : "0.5"},
+            //     {"rotate"   : "0"   },
+            //     {"translate": "0, 0"}
             ],
-            "distBounds": "1, 1, 1",
-            "scaleBounds": "1, 1, 1",
+            "distBounds": "0",
+            "scaleBounds": "1",
             "modifiers": ["disableRandomRotation"]
         }
     },
@@ -21,7 +22,7 @@
         "exampleVel": {
             "equationX": "x",
             "equationY": "y",
-            "speedBounds": "1, 1, 1",
+            "speedBounds": "10",
             "angleSweep": "-PI, PI",
             "modifiers": ["disableRandomRotation"]
         }

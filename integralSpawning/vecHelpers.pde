@@ -6,10 +6,10 @@ PVector vec3(float x, float y) { return new PVector(x, y, 0); }
 PVector vec3(float x) { return new PVector(x, x, x); }
 PVector vec3() { return new PVector(0, 0, 0); }
 
-PVector mulVec(PVector vec1, PVector vec2) {
+PVector mulVecCopy(PVector vec1, PVector vec2) {
     return new PVector(vec1.x * vec2.x, vec1.y * vec2.y);
 }
-PVector mulVecStatic(PVector vec1, PVector vec2) {
+PVector mulVec(PVector vec1, PVector vec2) {
     vec1.set(vec1.x * vec2.x, vec1.y * vec2.y);
     return vec1;
 }
