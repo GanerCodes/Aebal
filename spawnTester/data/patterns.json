@@ -1,0 +1,77 @@
+// Note if you're in VSCode you should set JSON's file association to "jsonc" to get rid of squiggles, this isn't actually jsonc just lines that start with (excluding whitespace) "//" are removed
+// At least one location and velocity pattern is required. Example template is marked below, with filled in values being the defaults
+// Starred sections = required
+// Bounds can take 1, 2, or 3 parameters
+//     1: No variance, property is always this value
+//     2: Variance between 1st and 2nd parameters [depending on song intensity for some properties]
+//     3: Same as #2 but the "average" intensity targets the 2nd parameter, so the middle, which is defaultly the midpoint in #2 
+
+//   | {
+// * |     "location": {
+// * |         "examplePattern": {
+//   |             "difficulty": 0,
+// * |             "velChoices": ["exampleVel"], //Order has no effect
+//   |             "categories": ["default"], //Mostly for internal use, order has no effect
+// * |             "equation": "abs(y + abs(x)) + abs(x) - 1",
+//   |             "range": 1,
+//   |             "transform": [ //unlimited transformations allowed. Ran in provided order
+//   |                 {"scale"    : "1"   },
+//   |                 {"rotate"   : "0"   },
+//   |                 {"translate": "0, 0"}
+//   |             ],
+//   |             "countBounds": "5, 5, 5", //25, 25, 25 when parametric.
+//   |             "distBounds" : "0, 0, 0", //0 = center of screen, 1 = edge of screen
+//   |             "scaleBounds": "1, 1, 1",
+//   |             "rotationSnapping": "0", //how many segments, ex. 2 = 0, 180 degrees, 4 is 0, 90, 180, 270, etc; 0 = unlimited
+//   |             "modifiers": [] //Options: disableRandomRotation
+//   |         }
+//   |     },
+// * |     "velocity": { //Can take all the same parameters as location. However this cannot be implicit, and distBounds/velChoices/categories don't do anything
+// * |         "exampleVel": {
+// * |             "equationX": "x",
+// * |             "equationY": "y",
+//   |             "speedBounds": "1, 1, 1",
+//   |             "angleSweep": "-PI, PI", //Takes exactly two parameters
+//   |             "modifiers": [] //Options: disableRandomRotation, disableRotationStacking
+//   |         }
+//   |     }
+//   | }
+
+{
+    "location": {
+        "solidTriangle": {
+            "difficulty": 1,
+            "velChoices": ["linearUp"],
+            "catagories": ["default"],
+            "equation": "abs(y + abs(x)) + abs(x) - 1",
+            "range": 1,
+            "countBounds": "5, 7",
+            "distBounds": "0.3, 0.8",
+            "scaleBounds": "0.5, 1.25"
+        },
+        "diag": {
+            "difficulty": 0,
+            "velChoices": ["constDiag"],
+            "categories": ["default", "beat"],
+            "equationX": "0",
+            "equationY": "0",
+            "countBounds": "1",
+            "distBounds": "0",
+            "modifiers": ["disableRandomRotation"]
+        }
+    },
+    "velocity": {
+        "linearUp": {
+            "equationX": "0",
+            "equationY": "1",
+            "speedBounds": "0.5, 2"
+        },
+        "constDiag": {
+            "equationX": "1",
+            "equationY": "1",
+            "rotationSnapping": 4,
+            "modifiers": ["disableRotationStacking"]
+        }
+
+    }
+}
