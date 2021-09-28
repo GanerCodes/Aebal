@@ -24,9 +24,9 @@ PFont defaultFont, songFont;
 GameMap gameMap;
 PGraphics back, loading_animation_buffer;
 boolean intense, allowDebugActions, cancerMode, keydown_SHIFT, checkTimes, textSFXPlaying, songEndScreenSkippable, mouseOverSong, paused, show_fade_in = true;
-int curX, curY, monitorID, cancerCount, score, hitCount, gameFrameCount, durationInto, song_intensity_count, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1, nextVolumeSFXplay = -1, delayedSceneTimer = -1;
-float gameFrameRateTotal, scrollWait, fps_tracker, gameSelect_songSelect, gameSelectExtraYOffset, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, song_total_intensity, millisDelta, fadeDuration = 5000, fadeOpacityStart = 400, fadeOpacityEnd = 0, grayScaleTimer = 100, trailingAngle = 0, trailStrokeWeight = 4.5;
-String delayedSceneScene, settingsFileLoc, songDataFileLoc, previousScene, gameState = "title";
+int clearEnemies, curX, curY, monitorID, cancerCount, score, hitCount, gameFrameCount, durationInto, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1, nextVolumeSFXplay = -1, delayedSceneTimer = -1;
+float gameFrameRateTotal, scrollWait, fps_tracker, gameSelect_songSelect, gameSelectExtraYOffset, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, millisDelta, fadeDuration = 5000, fadeOpacityStart = 400, fadeOpacityEnd = 0, grayScaleTimer = 100, trailingAngle = 0, trailStrokeWeight = 4.5;
+String mapGenerationText, delayedSceneScene, settingsFileLoc, songDataFileLoc, previousScene, gameState = "title";
 int[] cancerKeys = { UP, UP, DOWN, DOWN, LEFT, RIGHT, LEFT, RIGHT, 66, 65, ENTER};
 RNG GFX_R, GAME_R;
 PVector pos, previousPos, randTrans, prevTrailLoc, screenSize, trailLoc, chroma_r, chroma_g, chroma_b;
@@ -162,8 +162,9 @@ void unpause(boolean setFPS) {
 }
 
 void loadSong() {
-    logmsg(str(songComplexity));
-    gameMap = new GameMap(songP.fileName, sketchPath("patterns.json"), screenSize, new RNG(), songComplexity);
+    mapGenerationText = "Loading...";
+    logmsg("Song complexity: " + str(songComplexity));
+    gameMap = new GameMap(songP.fileName, sketchPath("patterns.json"), screenSize, GAME_R, songComplexity);
     logmsg(String.format("Song arr length: %s; SPS: %s", gameMap.complexityArr.length, gameMap.complexityArr.length / (gameMap.song.length() / 1000.0)));
     gameMap.song.setVol(volSlider.val);
     gameMap.song.play();
@@ -199,21 +200,17 @@ void resetEnemies(int scoreDeduction, float time) {
             floatingPrompts.add(new floatingText(loc.x, loc.y, 1500, str(-scoreDeduction - (isInside ? 1 : 0))));
         }
     }
-    // for(obj o: objs) {
-        // o.timer = 0;
-        // boolean isInside = (scoreDeduction > 0) && o.inBox();
-        // if(isInside) score--;
-        // if(DO_HIT_PROMPTS.state) floatingPrompts.add(new floatingText(o.loc.x, o.loc.y, 1500, str(-scoreDeduction - (isInside ? 1 : 0))));
-    // }
 }
 
-void gotHit(int scoreDeduction, int timerDelay, boolean clearEnemies, int individualPointReduction, float time) {
+void gotHit(int scoreDeduction, int timerDelay, int individualPointReduction, float time) {
+    if(clearEnemies != -1) return;
+    
     grayScaleTimer = 0;
     if(!NO_DAMAGE.state) {
         hitCount++;
         score -= min(scoreDeduction, MAX_SIMULTANEOUS_DAMAGE);
         noScoreTimer = timerDelay;
-        if(clearEnemies) resetEnemies(individualPointReduction, time);
+        clearEnemies = individualPointReduction;
         hitSound.play();
     }
 }
@@ -222,8 +219,6 @@ void resetLevel() {
     score = 0;
     hitCount = 0;
     levelSummary_timer = 0;
-    song_total_intensity = 0;
-    song_intensity_count = 0;
     textSFX.stop();
     a = new arrow(gameWidth / 2, gameHeight / 2, 0, 500, 1700);
     back.beginDraw();
@@ -432,7 +427,7 @@ class arrow {
             )) {
             if(noScoreTimer <= 0) {
                 int scorePer = cancerMode ? 4 : 2;
-                gotHit(getOnScreenObjCount() * scorePer + 3, 60, true, scorePer, time);
+                gotHit(getOnScreenObjCount() * scorePer + 3, 60, scorePer, time);
                 if(!NO_DAMAGE.state) floatingPrompts.add(new floatingText(x + cos(a) * d1, y + sin(a) * d1, 2250, "-3"));
             }
         }
@@ -463,62 +458,6 @@ class arrow {
         base.strokeCap(PROJECT);
     }
 }
-
-/*class obj {
-    PVector loc, ploc, vel;
-    int timer;
-    obj(PVector loc, PVector vel) {
-        this.loc = loc;
-        this.ploc = loc;
-        this.vel = vel;
-        timer = 1;
-    }
-    obj(float x, float y, float vx, float vy) {
-        this.loc = new PVector(x, y);
-        this.ploc = this.loc.copy();
-        this.vel = new PVector(vx, vy);
-        timer = 1;
-    }
-
-    boolean onScreen() {
-        return (loc.x > -10 && loc.x < gameWidth + 10 && loc.y > -10 && loc.y < gameHeight + 10);
-    }
-    boolean inBox() {
-        return (loc.x > gameWidth / 2 - (f.size / 2) - 2 && loc.x < gameWidth / 2 + (f.size / 2) + 2 && loc.y > gameHeight / 2 - (f.size / 2) - 2 && loc.y < gameHeight / 2 + (f.size / 2) + 2);
-    }
-    void move() {
-        float speed = int(c * 14.5) / 6.25 + 0.1;
-
-        ploc = loc.copy();
-        loc.add(PVector.mult(vel, speed * (60 / frameRate)));
-        if(timer == 3) {
-            score++;
-            timer = 0;
-        }
-        if(timer == 2 && !onScreen()) {
-            timer = 3;
-        }
-        if(timer == 1 && onScreen()) {
-            timer = 2;
-        }
-
-        if(loc.x > pos.x - 20 && loc.x < pos.x + 20 && loc.y > pos.y - 20 && loc.y < pos.y + 20) {
-            gotHit(getOnScreenObjCount(), 30, true, 1);
-        }
-    }
-    void draw(PGraphics base) {
-        if(BACKGROUND_FADE.state) {
-            base.strokeWeight(20);
-            back.stroke(globalObjColor);
-            back.strokeCap(SQUARE);
-            base.line(ploc.x, ploc.y, loc.x, loc.y);
-            base.noStroke();
-            base.circle(loc.x, loc.y, 20);
-        }else{
-            base.circle(loc.x, loc.y, 20);
-        }
-    }
-}*/
 
 class floatingText {
     String txt;
@@ -715,10 +654,13 @@ void draw() {
         return;
     }
 
+    durationInto = int(adjMillis() - sceneOffsetMillis);
+
+    //Scale to monitor size
     float scaleFactW = float(width) / gameWidth;
     float scaleFactH = float(height) / gameHeight;
     float scaleFact = min(scaleFactW, scaleFactH);
-
+    
     pushMatrix();
     if(scaleFact == scaleFactH) {
         float t = (width - gameWidth * scaleFact) / 2.0;
@@ -732,6 +674,7 @@ void draw() {
         curY = int(map(mouseY, t, (height + gameHeight * scaleFact) / 2.0, 0, gameHeight));
     }
     scale(scaleFact);
+    
     previousCursor = activeCursor;
     if(TIMING_INFO.state) {
         if(millis() > timerUpdateTime) {
@@ -741,9 +684,7 @@ void draw() {
             checkTimes = false;
         }
     }
-
-    durationInto = int(adjMillis() - sceneOffsetMillis);
-
+    
     switch(gameState) {
         case "title": {
             background(0);
@@ -884,18 +825,9 @@ void draw() {
         } break;
 
         case "game": {
-            // float tmp_intensity = findComplexity(song.getMix().toArray()) * (0.65 + (0.2 + song.getMix().level()) / 2.0);
-            // if(tmp_intensity < 0.1) {
-            //     tmp_intensity = pow(tmp_intensity, 1.0 / 3) / 4.65;
-            // }
-            // c = tmp_intensity * songComplexity;
-            // song_total_intensity += tmp_intensity;
-            // song_intensity_count++;
             noScoreTimer -= (60 / frameRate);
             TT("Physics");
             float time = float(gameMap.song.position()) / 1000.0;
-            // float time = adjMillis() / 1000.0;
-            println(time, gameMap.song.position() / 1000.0);
             
             previousPos.set(pos.x, pos.y);
             pos.set(curX, curY);
@@ -935,152 +867,6 @@ void draw() {
             score = max(0, score);
             
             TT("Physics");
-
-            /*{ //Physics
-                if(objSpawnTimer <= 0 && DO_ENEMY_SPAWNING) { //Object spawning
-                    float speed = GAME_R.random(5, 12) * (1 + 3.5 * c);
-
-                    float v = min(gameHeight, f.size * 1.5) / 2;
-                    PVector loc = GAME_R.random(0, 1) <= 0.15 ? pos.copy() : vec2(gameWidth / 2 + GAME_R.random(-v, v), gameHeight / 2 + GAME_R.random(-v, v));
-                    float dis = 1.5 * sqrt(sq(gameWidth) + sq(gameHeight));
-                    float n = int(GAME_R.random(3, 3 + c * 4));
-
-                    float rng = GAME_R.random(c / 10, max(1, c * 2));
-                    if(cancerMode) rng = min(1, rng * 2.5);
-                    int SPAWN_PATTERN = 0;
-
-                    if(GAME_R.rProp(min(0.15, (c - 0.25)))) {
-                        objSpawnTimer = max(objSpawnTimer, 0) + c * 15;
-                        if(rng < 0.3) {
-                            SPAWN_PATTERN = 1;
-                        }else if(rng < 0.4) {
-                            SPAWN_PATTERN = 2;
-                        }else if(rng < 0.5) {
-                            SPAWN_PATTERN = 3;
-                        }else if(rng < 0.6) {
-                            SPAWN_PATTERN = 4;
-                        }else if(rng < 0.75) {
-                            SPAWN_PATTERN = 5;
-                        }else{
-                            SPAWN_PATTERN = 6;
-                        }
-                    }
-
-                    switch(SPAWN_PATTERN) {
-                        case 0: { //Single
-
-                            loc = generateLoc(300);
-                            float TLX = lerp(GAME_R.random(gameWidth / 2 - f.size / 2, gameWidth / 2 + f.size / 2), pos.x, GAME_R.random());
-                            float TLY = lerp(GAME_R.random(gameHeight / 2 - f.size / 2, gameHeight / 2 + f.size / 2), pos.y, GAME_R.random());
-                            addEnemy(loc, PVector.fromAngle(atan2(TLY - loc.y, TLX - loc.x)).mult(speed));
-                        } break;
-                        case 1: { //star, circle, spiral
-
-                            boolean isSpiral = GAME_R.rProp(0.2);
-                            if(isSpiral) {
-                                speed /= 2;
-                            }else{
-                                speed /= 1.2;
-                            }
-                            float isCircle = GAME_R.rProp(0.33) ? GAME_R.random(450, 550) - c * 125 : 0;
-                            if(isCircle > 0) {
-                                n = n * 3 + int(c * 3.5);
-                            }
-                            float rad = GAME_R.rBool() ? 0 : GAME_R.random(250);
-                            float adder = isSpiral ? (0.35 - min(c, 1.5) / 15) : (2 * PI) / n;
-                            for(float a = 0; a < TWO_PI; a += adder) {
-                                float adjA = a + QUARTER_PI;
-                                float adjDist = isSpiral ? dis + a * 700 : dis;
-
-                                PVector spawnLoc = loc.copy().add(PVector.fromAngle(adjA).mult(adjDist)).add(vec2(sin(adjA), cos(adjA)).mult(rad));
-                                if(isCircle > 0) spawnLoc.add(PVector.fromAngle(a + HALF_PI).mult(isCircle));
-                                addEnemy(spawnLoc, PVector.fromAngle(adjA).mult(-speed));
-                            }
-                        } break;
-                        case 2: { //Line
-
-                            float a = GAME_R.random(2 * PI);
-                            speed /= 1.1;
-                            n = 3 + c * 14;
-                            for(int l = -int(n); l <= n; l++) {
-                                float nX = 2 * dis * cos(a) + l * (dis / n) * cos(a + HALF_PI);
-                                float nY = 2 * dis * sin(a) + l * (dis / n) * sin(a + HALF_PI);
-                                objs.add(
-                                    new obj(
-                                        nX, nY, -speed * cos(a), -speed * sin(a)
-                                    )
-                                );
-                            }
-                        } break;
-                        case 3: { //Square & Circle
-
-                            float sz = 50 + c * 80;
-                            float screenAngle = GAME_R.random(TWO_PI);
-                            float objRot = GAME_R.random(TWO_PI) + HALF_PI;
-                            boolean mode = GAME_R.rBool();
-                            float density = max(0.2, 0.5 - c / 3) / (mode ? 1.4 : 1);
-                            speed /= 2;
-                            for(float x = -1; x < 1; x += density) {
-                                for(float y = -1; y < 1; y += density) {
-                                    if(mode && sq(x) + sq(y) > 1) continue;
-                                    objs.add(new obj(
-                                        loc.x + dis * cos(screenAngle) + sz * (x * cos(objRot) - y * sin(objRot)),
-                                        loc.y + dis * sin(screenAngle) + sz * (x * sin(objRot) + y * cos(objRot)),
-                                        -speed * cos(screenAngle), -speed * sin(screenAngle)
-                                    ));
-                                }
-                            }
-                        } break;
-                        case 4: { //Triangle
-
-                            float sz = 40 - c * 25;
-                            n = 2 * (n + int(c * 2.5)) + 1;
-                            float screenAngle = GAME_R.random(TWO_PI);
-                            float objRot = screenAngle + HALF_PI;
-                            speed /= 2;
-                            for(int i = 0; i < n; i++) {
-                                float x = (i - floor(n / 2));
-                                float y = (floor(n / 2 - abs(x)));
-                                objs.add(new obj(
-                                    loc.x + dis * cos(screenAngle) + sz * (x * cos(objRot) - y * sin(objRot)),
-                                    loc.y + dis * sin(screenAngle) + sz * (x * sin(objRot) + y * cos(objRot)),
-                                    -speed * cos(screenAngle), -speed * sin(screenAngle)
-                                ));
-                            }
-                        } break;
-                        case 5: { //Triangle, square, pentagon, hexagon
-
-                            n = int(GAME_R.random(3, 6.25));
-                            int d = 1 + int(c * 5);
-                            float sz = GAME_R.random(250, 750 - c * 250);
-                            float objRot = GAME_R.random(TWO_PI);
-                            loc.lerp(vec2(gameWidth / 2, gameHeight / 2), GAME_R.random());
-                            for(float i = 0; i < TWO_PI; i += TWO_PI / (n * d)) {
-                                PVector objLoc = PVector.fromAngle(TWO_PI / n * floor(n * i / TWO_PI)).lerp(PVector.fromAngle(TWO_PI / n * ceil(n * i / TWO_PI)), (i * n / TWO_PI) % 1.0).rotate(objRot).mult(sz).add(loc);
-                                PVector objVel = PVector.sub(loc, objLoc).setMag(1).rotate(HALF_PI);
-                                objs.add(new obj(
-                                    PVector.add(objLoc, PVector.mult(objVel, -dis)),
-                                    objVel.setMag(speed / 2)
-                                ));
-                            }
-                        } break;
-                        case 6: {
-                            objs.addAll(getRandomGroup(locExpressions, velExpressions, screenSize, GAME_R, max(50, int(c * 30)), max(1, c + 0.25), max(0.2, 2 - c)));
-                            objSpawnTimer += 60;
-                        } break;
-                    }
-                    objSpawnTimer = max(objSpawnTimer, 0) + (30 - c * 10);
-                }
-
-                for(int i = objs.size() - 1; i > -1; i--) {
-                    obj cc = objs.get(i);
-                    if(cc.timer <= 0) {
-                        objs.remove(i);
-                        continue;
-                    }
-                    cc.move();
-                }
-            }*/
 
             if(DYNAMIC_BACKGROUND_COLOR.state) {
                 colorMode(HSB);
@@ -1165,7 +951,7 @@ void draw() {
                 back.noStroke();
             }
             TT("Enemies");
-            gameMap.drawEnemies(back, time, globalObjColor, BACKGROUND_FADE.state);
+            gameMap.drawEnemies(back, time, pos, globalObjColor, BACKGROUND_FADE.state);
             TT("Enemies");
             a.drawHead(back, 128);
             back.endDraw();
@@ -1254,7 +1040,7 @@ void draw() {
             fill(144, 227, 154);
             textSize(50);
             textAlign(LEFT, TOP);
-            text("Score: " + score + ", " + gameMap.getIntensityIndex(time) + ", " + gameMap.getIntensity(time), 10, 0);
+            text("Score: " + score + "\n\n" + gameMap.enemies.size() + '\n' + time + '\n' + gameMap.getIntensityIndex(time) + '\n' + gameMap.getIntensity(time) + '\n' + gameMap.getIntegralVal(gameMap.SPS *  time), 10, 0);
 
             if(SHOW_SONG_NAME.state) {
                 fill(255, 200);
@@ -1282,6 +1068,11 @@ void draw() {
                 }
             }
 
+            if(clearEnemies != -1) { //Used to avoid concurrentmodificationexception when clearing enemies when their drawn
+                resetEnemies(clearEnemies, time);
+                clearEnemies = -1;
+            }
+
             if(!gameMap.song.isPlaying()) {
                 if(levelSummary_timer == 0) {
                     if(gameMap.enemies.size() > 0 && DO_HIT_PROMPTS.state) {
@@ -1302,7 +1093,6 @@ void draw() {
                     setScene("levelSummary");
                     textSFXPlaying = false;
                     screenshot();
-                    logmsg("Average calculated intensity: " + song_total_intensity / song_intensity_count);
                 }
             }
         } break;
@@ -1354,7 +1144,7 @@ void draw() {
             fill(255);
             textFont(songFont, 60);
             textAlign(CENTER, CENTER);
-            text("Loading...", gameWidth / 2, gameHeight / 2);
+            text(mapGenerationText + '\n' + durationInto, gameWidth / 2, gameHeight / 2);
         } break;
         case "load_long": {
             activeCursor = ARROW;
@@ -1466,6 +1256,8 @@ void draw() {
                 }
             }
         }
+        
+        textFont(defaultFont);
         if(DEBUG_INFO.state) { //Debug log
             msgList.x = gameWidth - 8;
             msgList.y = timing_y;

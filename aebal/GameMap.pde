@@ -1,5 +1,10 @@
 import java.util.Comparator;
 
+void setLoadingText(String s) {
+    mapGenerationText = s + "...";
+    logmsg(s);
+}
+
 class GameMap {
     int SPS, formCount, spawnIndex;
     float finalIntegralValue, songDuration, defaultSpeed, dt, marginSize, difficulty;
@@ -34,6 +39,7 @@ class GameMap {
     }
 
     void prepareSong(AudioSample songRaw) {
+        setLoadingText("Calculating intensities");
         float[] leftSamples  = songRaw.getChannel(AudioSample.LEFT );
         float[] rightSamples = songRaw.getChannel(AudioSample.RIGHT);
         float[] samples = new float[rightSamples.length];
@@ -60,7 +66,9 @@ class GameMap {
         this.rng = rng;
 
         song = new Music(songName, -20.0);
+        setLoadingText("Loading song...");
         prepareSong(minim.loadSample(songName));
+        setLoadingText("Loading patterns...");
         spawner = new PatternSpawner(patternFileName);
         generateEnemies();
     }
@@ -112,6 +120,8 @@ class GameMap {
     void generateEnemies() {
         resetEnemies();
 
+        setLoadingText("Adjusting intensity...");
+
         float average = 0;
         for(int i = 0; i < complexityArr.length; i++) average += complexityArr[i];
         average /= complexityArr.length;
@@ -136,8 +146,10 @@ class GameMap {
             complexityArr[i] = c + boost;
         }
 
+        setLoadingText("Generating position integral...");
         generateIntegral(generateVels(), gameSize);
 
+        setLoadingText("Performing beat detection...");
         float intensityScale = 1 / average + 2.25 * totalComplexity;
         { //Beat detection [AIDS WARNING]
             int minSeg = iSec / 3;
@@ -179,7 +191,7 @@ class GameMap {
                         if(complexityArr[beatTime] < thres1) {
                             createPattern("beat", beatTime * sampSecFactor, complexityArr[beatTime] * intensityScale, PatternSpawner.INTERCEPT_DEFAULT);
                         }else{
-                            createPattern("heavyBeat", beatTime * sampSecFactor, complexityArr[beatTime] * intensityScale, PatternSpawner.INTERCEPT_DEFAULT);
+                            createPattern("heavyBeat", beatTime * sampSecFactor, complexityArr[beatTime] * intensityScale, PatternSpawner.INTERCEPT_ENTER);
                         }
                         enemies.add(createEnemy(vec2(gameSize.x, height / 2), vec2(1, 0), beatTime * sampSecFactor));
                     }
@@ -191,7 +203,6 @@ class GameMap {
         enemies.sort(new enemySpawnTimeSorter());
         enemySpawns = enemies.toArray(new Enemy[enemies.size()]);
         enemies = new ArrayList<Enemy>();
-
     }
     float findComplexity(float[] k) { //Variance calculation
         float adv = 0;
@@ -266,8 +277,8 @@ class GameMap {
     void drawPlayer(PGraphics base, PVector pos, int mouseX, int mouseY) {
         field.drawPlayer(base, pos, mouseX, mouseY);
     }
-    void drawEnemies(PGraphics base, float time, color enemyColor, boolean fancy) {
+    void drawEnemies(PGraphics base, float time, PVector pos, color enemyColor, boolean fancy) {
         base.noStroke();
-        for(Enemy e : enemies) e.draw(base, time, enemyColor, fancy);
+        for(Enemy e : enemies) e.draw(base, time, pos, enemyColor, fancy);
     }
 }

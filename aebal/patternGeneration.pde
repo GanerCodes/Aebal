@@ -136,6 +136,9 @@ class Equation {
             ID, equationPrintable, Arrays.toString(categories), Arrays.toString(relatedEquationNames), spawnProperties.toString().replaceAll("(?m)^", "\t\t")
         );
     }
+    String toShortString() {
+        return String.format("\"%s\": %s", ID, equationPrintable);
+    }
 }
 class Equation1D extends Equation { //1 output dimension; implicit equation
     String equationStr;
@@ -324,7 +327,7 @@ class PatternSpawner {
             }
         }
 
-        logmsg(equation.toString());
+        logmsg(equation.toShortString());
         return equation;
     }
     
@@ -471,6 +474,7 @@ class PatternSpawner {
             if(!velocityProps.disableRandomRotation) {
                 vel.rotate(velRotation);
             }
+            
             vel.mult(speed).add(velDistAdj);
         }
 
@@ -482,8 +486,8 @@ class PatternSpawner {
                 logmsg(String.format("Enemy was excluded for having low or zero velocity: [t=%ss] ([%s, %s], [%s, %s])", time, loc.x, loc.y, vel.x, vel.y));
                 continue;
             }
-            //todo: add field to songmap and have default location multiplier be min fieldsize / 3
-            loc.mult(gameMap.field.minCenterSize).add(gameMap.gameCenter).add(locDistAdj);
+            
+            loc.mult(gameMap.field.minCenterSize / 3.0).add(gameMap.gameCenter).add(locDistAdj);
             if(!velRectIntersection(loc, vel, gameMap.gameSize, gameMap.gameCenter)) {
                 logmsg(String.format("Enemy was excluded for having no intersection with play area: [t=%ss] ([%s, %s], [%s, %s])", time, loc.x, loc.y, vel.x, vel.y));
                 continue;
@@ -512,7 +516,9 @@ class PatternSpawner {
             for(int i = enemies.size() - 1; i >= 0; i--) {
                 Enemy e = enemies.get(i);
                 e.loc.add(locOffset);
-                enemies.set(i, gameMap.createEnemy(e, time));
+                
+                e = gameMap.createEnemy(e, time);
+                enemies.set(i, e);
                 
                 if(e.spawnTime < 0) {
                     logmsg(String.format("Enemy was excluded for being on screen at song start: [t=%ss] (%s)", time, e));
@@ -520,7 +526,7 @@ class PatternSpawner {
                 }
             }
         }
-
+        
         return enemies;
     }   
 }

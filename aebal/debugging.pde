@@ -27,8 +27,14 @@ class debugList {
         g.textAlign(RIGHT, TOP);
         for(int i = messages.size() - 1; i >= 0; i--) {
             debugMessage msg = messages.get(i);
-            g.fill(255, clampMap(adjMillis(), msg.decayTime - msg.fadeOutDuration, msg.decayTime, 255, 0));
-            g.text((msg.count > 1 ? "[x"+msg.count+"] " : "") + msg.msg, x, y + (messages.size() - i) * 15);
+            float opacity = clampMap(adjMillis(), msg.decayTime - msg.fadeOutDuration, msg.decayTime, 255, 0);
+            String msgText = (msg.count > 1 ? "[x"+msg.count+"] " : "") + msg.msg;
+            float msgWidth = textWidth(msgText);
+            float yOffset = y + (messages.size() - i) * 15;
+            g.fill(0, opacity / 5.0);
+            g.rect(x - msgWidth, y, msgWidth, 15);
+            g.fill(255, opacity);
+            g.text(msgText, x, yOffset);
             if(adjMillis() >= msg.decayTime) messages.remove(i);
         }
     }

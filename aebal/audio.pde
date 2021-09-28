@@ -39,7 +39,7 @@ abstract class Sound {
 
 class SFX extends Sound {
     AudioSample sound;
-    int playStartTime = -1;
+    int endPlayTime = -1;
     SFX(String soundName, float defaultVolume) {
         super(soundName, defaultVolume);
     }
@@ -58,18 +58,18 @@ class SFX extends Sound {
         if(isLoaded()) sound.setGain(defaultVolume + volume);
     }
     void play() {
-        playStartTime = millis();
+        endPlayTime = millis() + length();
         sound.trigger();
     }
     void stop() {
         sound.stop();
-        playStartTime = -1;
+        endPlayTime = -1;
     }
     int length() {
         return sound.length();
     }
     boolean isPlaying() {
-        return millis() < playStartTime;
+        return millis() < endPlayTime;
     }
     int position() { return -1; }
     void pause() {}
@@ -89,7 +89,7 @@ class Music extends Sound {
         return sound != null;
     }
     void loadSound(String soundName) {
-        this.sound = minim.loadFile(soundName, 128); //I don't think your supposed to do this but without it .position doesn't update fast enough 
+        this.sound = minim.loadFile(soundName, 256); //I don't think your supposed to do this but without it .position doesn't update fast enough 
         setVol(volume);
     }
     void setVol(float volume) {

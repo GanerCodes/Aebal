@@ -26,7 +26,7 @@ class Enemy {
     void resetEnemyTrail() {
         previousLoc = null;
     }
-    void draw(PGraphics base, float time, color enemyColor, boolean fancy) {
+    void draw(PGraphics base, float time, PVector pos, color enemyColor, boolean fancy) {
         PVector currentLoc = getLoc(time);
         if(previousLoc == null) previousLoc = currentLoc;
         
@@ -41,6 +41,9 @@ class Enemy {
         }
         previousLoc = currentLoc;
         base.circle(currentLoc.x, currentLoc.y, 20);
+        if(clearEnemies == -1 && currentLoc.x > pos.x - 20 && currentLoc.x < pos.x + 20 && currentLoc.y > pos.y - 20 && currentLoc.y < pos.y + 20) {
+            gotHit(getOnScreenObjCount(), 30, 1, time);
+        }
     }
     boolean inField(GameMap gameMap, float time) {
         PVector currentLoc = getLoc(time);
@@ -50,7 +53,7 @@ class Enemy {
         currentLoc.y <= gameMap.gameDisplaySize.y / 2 + gameMap.field.size / 2;
     }
     String toString() {
-        return String.format("Pos: (%f, %f), Vel: (%f, %f), SpawnTime: %f", loc.x, loc.y, vel.x, vel.y, spawnTime);
+        return String.format("Pos: (%f, %f), Vel: (%f, %f), ExistTime: [%fs - %fs]", loc.x, loc.y, vel.x, vel.y, spawnTime, despawnTime);
     }
 }
 
