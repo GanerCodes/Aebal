@@ -34,13 +34,14 @@ class debugList {
     }
 }
 
-void logmsg(String s) {
-    println("["+millis()+"] " + s);
-    s = s.replace("\n", "\\n");
-    if(msgList.messages.size() > 0 && msgList.messages.get(msgList.messages.size() - 1).msg.equals(s)) {
-        msgList.messages.get(msgList.messages.size() - 1).count++;
-    }else{
-        msgList.addMessage(s);
+void logmsg(String msg) {
+    println("["+millis()+"] " + msg);
+    for(String s : msg.split("\n")) {
+        if(msgList.messages.size() > 0 && msgList.messages.get(msgList.messages.size() - 1).msg.equals(s)) {
+            msgList.messages.get(msgList.messages.size() - 1).count++;
+        }else{
+            msgList.addMessage(s);
+        }
     }
 }
 

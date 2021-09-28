@@ -1,6 +1,7 @@
 int MOUSE_OVER    = 0;
 int MOUSE_PRESS   = 1;
 int MOUSE_RELEASE = 2;
+
 class button {
     float x, y, w, h, r;
     boolean active, state;
@@ -61,7 +62,7 @@ class button {
         }
         if(type > 0) {
             active = type == MOUSE_PRESS && over;
-            if(over && type == MOUSE_RELEASE) buttonSFX.playR();
+            if(over && type == MOUSE_RELEASE) buttonSFX.play();
         }
         return over;
     }
@@ -211,13 +212,13 @@ class vol_slider extends slider {
     }
     void onRelease() {
         activate();
-        volChangeSFX.playR();
+        volChangeSFX.play();
     }
     void onScroll() {
         nextVolumeSFXplay = millis() + 100;
     }
     void activate() {
-        setGlobalVolume(volSlider.val);
+        setGlobalVolume(val);
     }
 }
 
