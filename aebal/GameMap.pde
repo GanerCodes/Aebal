@@ -8,7 +8,7 @@ void setLoadingText(String s) {
 class GameMap {
     int SPS, formCount, spawnIndex;
     float finalIntegralValue, songDuration, defaultSpeed, dt, marginSize, difficulty;
-    String songName;
+    String songName, patternFileName;
     PVector gameDisplaySize, gameSize, gameCenter;
     float[] velArr, integralArr, complexityArr;
     
@@ -59,17 +59,21 @@ class GameMap {
             complexityArr[i] = difficulty * findComplexity(buffer) * (1 + rootMeanSquare(buffer)) / 2;
         }
     }
+    void loadPatternFile() {
+        setLoadingText("Loading patterns");
+        spawner = new PatternSpawner(patternFileName);
+    }
     GameMap(String songName, String patternFileName, PVector gameSize, RNG rng, float difficulty) {
         init(gameSize);
         this.songName = songName;
         this.difficulty = difficulty;
+        this.patternFileName = patternFileName;
         this.rng = rng;
 
         song = new Music(songName, -20.0);
-        setLoadingText("Loading song...");
+        setLoadingText("Loading song");
         prepareSong(minim.loadSample(songName));
-        setLoadingText("Loading patterns...");
-        spawner = new PatternSpawner(patternFileName);
+        loadPatternFile();
         generateEnemies();
         score = 0;
     }
@@ -112,6 +116,13 @@ class GameMap {
         removeExpiredEnemies(time);
         addRecentEnemies(time);
     }
+    int getIntensityIndex(float time) {
+        return constrain(int(1000 * time * complexityArr.length / song.length()), 0, complexityArr.length - 1);
+    }
+    float getIntensity(float time) {
+        return complexityArr[getIntensityIndex(time)];
+    }
+    
     void resetEnemiesWithIndex() {
         spawnIndex = 0;
         enemies = new ArrayList<Enemy>();
@@ -121,25 +132,16 @@ class GameMap {
         enemySpawns = enemies.toArray(new Enemy[enemies.size()]);
         resetEnemiesWithIndex();
     }
-    int getIntensityIndex(float time) {
-        return constrain(int(1000 * time * complexityArr.length / song.length()), 0, complexityArr.length - 1);
-    }
-    float getIntensity(float time) {
-        return complexityArr[getIntensityIndex(time)];
+    void flattenComplexityArr() {
+        for(int i = 0; i < complexityArr.length; i++) complexityArr[i] = 0.5;
     }
     void generateTestPattern(String locName, String velName, float time) {
-        logf("Spawned \"%s\" pattern with velocity \"%s\" [t=%ss]", locName, velName, time);
-        resetEnemiesWithIndex();
-        for(int i = 0; i < complexityArr.length; i++) {
-            complexityArr[i] = 0.5;
-        }
         createPattern(locName, velName, time, 1.0);
-        convertEnemiesToArray();
     }
     void generateEnemies() {
         resetEnemiesWithIndex();
 
-        setLoadingText("Adjusting intensity...");
+        setLoadingText("Adjusting intensity");
 
         float average = 0;
         for(int i = 0; i < complexityArr.length; i++) average += complexityArr[i];
@@ -165,10 +167,10 @@ class GameMap {
             complexityArr[i] = c + boost;
         }
 
-        setLoadingText("Generating position integral...");
+        setLoadingText("Generating position integral");
         generateIntegral(generateVels(), gameSize);
         
-        setLoadingText("Performing beat detection...");
+        setLoadingText("Performing beat detection");
         { //Beat detection [AIDS WARNING]        
             int minSeg = iSec / 3;
             int maxSeg = 5 * iSec;

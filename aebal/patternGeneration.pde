@@ -183,6 +183,8 @@ class PatternSpawner {
     final static int INTERCEPT_ENTER   = 1;
     final static int INTERCEPT_EXIT    = 2;
 
+    boolean disableNegativeSpawnTimeExclusion = false;
+
     ArrayList<Equation> locations;
     ArrayList<Equation2D> velocities;
     HashMap<String, Equation>   locIDMapping;
@@ -220,6 +222,11 @@ class PatternSpawner {
         }
 
         init(locations, velocities);
+    }
+
+    String[] getLocVelFromIndices(int locIndex, int velIndex) {
+        String locID = locations.get(locIndex % locations.size()).ID;
+        return new String[] { locID, locIDVelMapping.get(locID).get(velIndex % locIDVelMapping.get(locID).size()).ID };
     }
 
     //intensity  [0   - 1]
@@ -404,8 +411,7 @@ class PatternSpawner {
         
         int   count        = round(lerpCentered(locationProps.countBounds, iLerp) * lerpCentered(velocityProps.countBounds, iLerp));
         float speed        =       lerpCentered(velocityProps.speedBounds, iLerp) * lerpCentered(locationProps.speedBounds, iLerp) ;
-        float locScale     =       lerpCentered(locationProps.scaleBounds, iLerp);
-        float velScale     =       lerpCentered(velocityProps.scaleBounds, iLerp);
+        float locScale     =       lerpCentered(locationProps.scaleBounds, iLerp) * lerpCentered(velocityProps.scaleBounds, iLerp) ;
 
         PVector locDistAdj = new PVector(
             0.5 * rng.randSgn(lerpCentered(locationProps.distBounds, rng.rand()) * gameMap.gameDisplaySize.x),
@@ -470,7 +476,7 @@ class PatternSpawner {
 
         for(int i = 0; i < locs.size(); i++) {
             PVector loc = locs.get(i).mult(locScale);
-            PVector vel = vels.get(i).mult(velScale);
+            PVector vel = vels.get(i).mult(speed   );
             
             if(!locationProps.disableRandomRotation) {
                 loc.rotate(locRotation);
@@ -482,7 +488,7 @@ class PatternSpawner {
                 vel.rotate(velRotation);
             }
             
-            vel.mult(speed).add(velDistAdj);
+            vel.add(velDistAdj);
         }
 
         ArrayList<Enemy> enemies = new ArrayList();
@@ -527,7 +533,7 @@ class PatternSpawner {
                 e = gameMap.createEnemy(e, time);
                 enemies.set(i, e);
                 
-                if(e.spawnTime < 0) {
+                if(e.spawnTime < 0 && !disableNegativeSpawnTimeExclusion) {
                     logmsg(String.format("Enemy was excluded for being on screen at song start: [t=%ss] (%s)", time, e));
                     enemies.remove(i);
                 }

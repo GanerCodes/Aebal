@@ -1377,19 +1377,19 @@ void keyPressed(KeyEvent e) {
                     switch(keyCode) {
                         case UP: {
                             songComplexity += 0.1;
-                            logmsg("Increased song complexity (%s)", );
+                            logmsg("Increased song complexity (%s)", songComplexity);
                         } break;
                         case DOWN: {
                             songComplexity -= 0.1;
-                            logmsg("Decreased song complexity (%s)", );
+                            logmsg("Decreased song complexity (%s)", songComplexity);
                         } break;
                         case LEFT: {
                             gameMap.song.skip(-15 * 1000);
-                            logmsg("Fowarded 15 seconds");
+                            logmsg("Rewinded 15 seconds");
                         } break;
                         case RIGHT: {
                             gameMap.song.skip( 15 * 1000);
-                            logmsg("Rewinded 15 seconds");
+                            logmsg("Fowarded 15 seconds");
                         } break;
                         default: {
                             switch(key) {
@@ -1397,13 +1397,41 @@ void keyPressed(KeyEvent e) {
                                     NO_DAMAGE.state = !NO_DAMAGE.state;
                                     logmsg(NO_DAMAGE.state ? "Enabled invincibility." : "Disabled invincibility");
                                 } break;
-                                case 'g': {
-                                    gameMap.generateTestPattern("triangle", "90deg", gameMap.song.getTime() + 1);
+                                case 'r': {
+                                    gameMap.spawner.disableNegativeSpawnTimeExclusion = true;
+                                    gameMap.resetEnemiesWithIndex();
+                                    gameMap.convertEnemiesToArray();
+                                    gameMap.loadPatternFile();
+                                    logmsg("Reset enemy spawns and reloaded pattern file.");
                                 } break;
-                                case 
+                                default: {
+                                    String[] currentIndices = gameMap.spawner.getLocVelFromIndices(patternTestLocIndex, patternTestVelIndex);
+                                    if(key == 'g') {
+                                        gameMap.generateTestPattern(currentIndices[0], currentIndices[1], gameMap.song.getTime() + 1);
+                                        logf("Spawned pattern \"%s\"|\"%s\"", currentIndices[0], currentIndices[1]);
+                                    }else{
+                                        if(key == 'l') {
+                                            patternTestLocIndex++;
+                                            patternTestVelIndex = 0;
+                                        }else if(key == 'v') {
+                                            patternTestVelIndex++;
+                                        }else if(key == 'h') {
+                                            patternTestLocIndex = int(random(0, 999999));
+                                            patternTestVelIndex = int(random(0, 999999));
+                                        }else{
+                                            break;
+                                        }
+                                        String[] newIndices = gameMap.spawner.getLocVelFromIndices(patternTestLocIndex, patternTestVelIndex);
+                                        logf("Changed Pattern \"%s\"|\"%s\" --> \"%s\"|\"%s\"", currentIndices[0], currentIndices[1], newIndices[0], newIndices[1]);
+                                        if(key == 'h') {
+                                            gameMap.generateTestPattern(newIndices[0], newIndices[1], gameMap.song.getTime() + 1);
+                                            logf("Spawned pattern \"%s\"|\"%s\"", newIndices[0], newIndices[1]);
+                                        }
+                                    }
+                                } break;
                             }
                         } break;
-                    }
+                    } break;
                 }
             } break;
             case "gameSelect": {

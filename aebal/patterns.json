@@ -44,45 +44,99 @@
             "equation": "abs(y + abs(x)) + abs(x) - 1",
             "range": 1.05,
             "countBounds": "10, 13",
-            "scaleBounds": "0.7, 1.3",
+            "scaleBounds": "0.5, 1",
+            "speedBounds": "0.5",
+            "distBounds": "0.25, 0.5"
+        },
+        "solidCircle": {
+            "difficulty": 0,
+            "velChoices": ["linearUp"],
+            "categories": ["default", "heavyBeat"],
+            "spawnMode": 1,
+            "equation": "pow(abs(x), 1.7) + pow(abs(y), 1.7) - 1",
+            "range": 1.075,
+            "countBounds": "7.5, 11",
+            "scaleBounds": "0.5, 0.9",
+            "speedBounds": "0.5",
+            "distBounds": "0.25, 0.5"
+        },
+        "solidSquare": {
+            "difficulty": 0,
+            "velChoices": ["linearUp"],
+            "categories": ["default", "heavyBeat"],
+            "spawnMode": 1,
+            "equation": "-1",
+            "range": 1,
+            "countBounds": "7.5, 11",
+            "scaleBounds": "0.5, 0.9",
             "speedBounds": "0.5",
             "distBounds": "0.25, 0.5"
         },
         "triangle": {
-            "velChoices": ["90deg"],
-            "categories": ["default", "heavyBeat"],
+            "velChoices": ["90deg", "linearShrink", "crissCross"],
+            "categories": ["heavyBeat"],
             "equationX": "cos(t)/(abs(sin(t)+abs(cos(t)))+abs(cos(t)))",
             "equationY": "sin(t)/(abs(sin(t)+abs(cos(t)))+abs(cos(t)))",
             "distBounds": "0, 0.25",
-            "scaleBounds": "2, 0.75",
-            "speedBounds": "0.4, 0.6",
-            "modifiers": ["evenSpacing"]
-        },
-        "square": {
-            "velChoices": ["90deg"],
-            "categories": ["default", "heavyBeat"],
-            "equationX": "cos(t)/max(abs(cos(t)), abs(sin(t)))",
-            "equationY": "sin(t)/max(abs(cos(t)), abs(sin(t)))",
-            "distBounds": "0, 0.25",
-            "scaleBounds": "2, 0.75",
             "speedBounds": "0.4, 0.6",
             "modifiers": ["evenSpacing"]
         },
         "circle": {
-            "velChoices": ["90deg"],
-            "categories": ["default", "heavyBeat"],
+            "velChoices": ["90deg", "linearShrink", "crissCross"],
+            "categories": ["heavyBeat"],
             "equationX": "cos(t)",
             "equationY": "sin(t)",
             "distBounds": "0, 0.25",
-            "scaleBounds": "2, 0.75",
             "speedBounds": "0.4, 0.6"
-        }
+        },
+        "field": {
+            "velChoices": ["linearUp"],
+            "categories": ["default", "heavyBeat"],
+            "equationX": "t",
+            "equationY": "0",
+            "countBounds": "10, 25",
+            "scaleBounds": "3",
+            "distBounds": "0, 0.075"
+        },
+        "hourglass": {
+            "velChoices": ["90deg", "linearShrink", "crissCross"],
+            "categories": ["default", "heavyBeat"],
+            "equationX": "(cos(t)*sin(t))/max(abs(cos(t)), abs(sin(t)))",
+            "equationY": "(sin(t))/max(abs(cos(t)), abs(sin(t)))",
+            "speedBounds": "0.4, 0.6"
+        },
+        "square": {
+            "velChoices": ["90deg", "linearShrink", "crissCross"],
+            "categories": ["default", "heavyBeat"],
+            "equationX": "cos(t)/max(abs(cos(t)), abs(sin(t)))",
+            "equationY": "sin(t)/max(abs(cos(t)), abs(sin(t)))",
+            "modifiers": ["disableRandomRotation"],
+            "angleBounds": "-pi, pi"
+            // "distBounds": "0, 0.25",
+            // "speedBounds": "0.4, 0.6",
+            // "modifiers": ["evenSpacing"]
+        },
     },
     "velocity": {
+        "crissCross": {
+            "equationX": "cos(t + pi / 2)",
+            "equationY": "sin(t + pi / 2)",
+            "countBounds": "5",
+            "modifiers": ["disableRandomRotation", "disableRotationStacking"]
+            // "speedBounds": "0.8, 1.2",
+            // "countBounds": "0.5, 0.8",
+        },
         "linearUp": {
             "equationX": "0",
             "equationY": "1",
-            "speedBounds": "0.5, 2",
+            "speedBounds": "0.75, 1.75",
+            "modifiers": ["disableRandomRotation"]
+        },
+        "linearShrink": {
+            "equationX": "0",
+            "equationY": "1",
+            "speedBounds": "1, 2.15",
+            "scaleBounds": "0.14, 0.65",
             "modifiers": ["disableRandomRotation"]
         },
         "constDiag": {
@@ -94,6 +148,7 @@
         "90deg": {
             "equationX": "cos(atan2(y, x) + pi / 2)",
             "equationY": "sin(atan2(y, x) + pi / 2)",
+            "scaleBounds": "2, 0.75",
             "modifiers": ["disableRandomRotation"]
         }
 
