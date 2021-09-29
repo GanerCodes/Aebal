@@ -128,4 +128,10 @@ class Music extends Sound {
     AudioBuffer getMix() {
         return sound.mix;
     }
+    float getTime() {
+        return float(position()) / 1000;
+    }
+    float getTimeFraction() {
+        return float(position()) / length();
+    }
 }

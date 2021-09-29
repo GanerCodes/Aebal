@@ -1,6 +1,6 @@
 class Enemy {
     PVector loc, vel;
-    PVector previousLoc;
+    PVector locCalc;
     float spawnTime, despawnTime, velOffset;
     GameMap gameMap;
     Enemy(GameMap gameMap, PVector loc, PVector vel, float spawnTime, float despawnTime) {
@@ -19,31 +19,30 @@ class Enemy {
     }
     PVector getLoc(float time) {
         float tt = time * gameMap.SPS;
-        // float calculatedDist = lerp(gameMap.getIntegralVal(floor(tt)), gameMap.getIntegralVal(ceil(tt)), tt - int(tt)) - velOffset;
-        float calculatedDist = gameMap.getIntegralVal(tt) - velOffset;
+        float calculatedDist = lerp(gameMap.getIntegralVal(floor(tt)), gameMap.getIntegralVal(ceil(tt)), tt - int(tt)) - velOffset;
+        // float calculatedDist = gameMap.getIntegralVal(tt) - velOffset;
         return PVector.add(loc, PVector.mult(vel, calculatedDist));
     }
     void resetEnemyTrail() {
-        previousLoc = null;
+        locCalc = null;
     }
     void draw(PGraphics base, float time, PVector pos, color enemyColor, boolean fancy) {
         PVector currentLoc = getLoc(time);
-        if(previousLoc == null) previousLoc = currentLoc;
+        if(locCalc == null) locCalc = currentLoc;
         
         base.fill(enemyColor);
+        base.noStroke();
+        base.circle(currentLoc.x, currentLoc.y, 20);
         if(fancy) {
             base.strokeWeight(20);
             base.stroke(enemyColor);
             base.strokeCap(SQUARE);
-            base.line(previousLoc.x, previousLoc.y, currentLoc.x, currentLoc.y);
-            base.noStroke();
-            // base.circle(previousLoc.x, previousLoc.y, 20);
+            base.line(locCalc.x, locCalc.y, currentLoc.x, currentLoc.y);
         }
-        previousLoc = currentLoc;
-        base.circle(currentLoc.x, currentLoc.y, 20);
         if(clearEnemies == -1 && currentLoc.x > pos.x - 20 && currentLoc.x < pos.x + 20 && currentLoc.y > pos.y - 20 && currentLoc.y < pos.y + 20) {
             gotHit(getOnScreenObjCount(), 30, 1, time);
         }
+        locCalc = currentLoc;
     }
     boolean inField(GameMap gameMap, float time) {
         PVector currentLoc = getLoc(time);

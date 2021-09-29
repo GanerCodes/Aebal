@@ -29,10 +29,10 @@ class debugList {
             debugMessage msg = messages.get(i);
             float opacity = clampMap(adjMillis(), msg.decayTime - msg.fadeOutDuration, msg.decayTime, 255, 0);
             String msgText = (msg.count > 1 ? "[x"+msg.count+"] " : "") + msg.msg;
-            float msgWidth = textWidth(msgText);
+            float msgWidth = textWidth(msgText) + 3;
             float yOffset = y + (messages.size() - i) * 15;
             g.fill(0, opacity / 5.0);
-            g.rect(x - msgWidth, y, msgWidth, 15);
+            g.rect(x - msgWidth, yOffset, msgWidth, 15);
             g.fill(255, opacity);
             g.text(msgText, x, yOffset);
             if(adjMillis() >= msg.decayTime) messages.remove(i);
@@ -42,13 +42,23 @@ class debugList {
 
 void logmsg(String msg) {
     println("["+millis()+"] " + msg);
-    for(String s : msg.split("\n")) {
+    String[] spl = msg.split("\n");
+    for(int i = spl.length - 1; i >= 0; i--) {
+        String s = spl[i];
         if(msgList.messages.size() > 0 && msgList.messages.get(msgList.messages.size() - 1).msg.equals(s)) {
             msgList.messages.get(msgList.messages.size() - 1).count++;
         }else{
             msgList.addMessage(s);
         }
     }
+}
+
+void logmsg(Object... params) {
+    String s = "";
+    for(int i = 0; i < params.length; i++) {
+        s += params[i].toString() + (i < params.length - 1 ? " " : "");
+    }
+    logmsg(s);
 }
 
 String format(String s, Object... params) {
@@ -61,12 +71,31 @@ void logf(String s, Object... params) {
     logmsg(format(s, params));
 }
 
+
+class timingDisplaySorter implements Comparator<timingDisplayElement> {
+    @Override
+    int compare(timingDisplayElement a, timingDisplayElement b) {
+        return Float.compare(b.precent, a.precent);
+    }
+}
+
+class timingDisplayElement {
+    float precent;
+    String display, name;
+    timingDisplayElement(float precent, String display, String name) {
+        this.precent = precent;
+        this.display = display;
+        this.name = name;
+    }
+}
+
 void TT(String ID) {
     if(TIMING_INFO.state && checkTimes) {
         if(timingList.containsKey(ID)) {
             float t = (float)(System.nanoTime() - timingList.get(ID)) / 1000000000;
-            String v = timerFormat.format(100 * t * frameRate)+"%     (" + timerFormat.format(t) + "s)";
-            timingDisplay.put(ID, v);
+            float precent  = 100 * t * frameRate;
+            String display = timerFormat.format(precent)+"%     (" + timerFormat.format(t) + "s)";
+            timingDisplay.put(ID, new timingDisplayElement(precent, display, ID));
             timingList.remove(ID);
         }else{
             timingList.put(ID, System.nanoTime());

@@ -12,22 +12,20 @@ float BACKGROUND_COLOR_FADE = 0.275; //Lerp value
 float songComplexity = 0.5;
 float FPS = 1000; //Wish I could uncap this
 float GAME_MARGIN_SIZE = 25;
-float DEFAULT_SPEED = 5;
+float DEFAULT_SPEED = 7.5;
 int GAMESELECT_SONGDISPLAYCOUNT = 10; //How many songs in the Song Selector to display up and down
 int MAX_SIMULTANEOUS_DAMAGE = 100; //Mono got mad at the circles
 int SAMPLES_PER_SECOND = 1024;
 int gameWidth = 1920, gameHeight = 1080; //xdd
 
+GameMap gameMap;
 SFX hitSound, buttonSFX, textSFX, volChangeSFX, songSelChange, gainScore;
 PFont defaultFont, songFont;
-
-GameMap gameMap;
 PGraphics back, loading_animation_buffer;
-boolean intense, allowDebugActions, cancerMode, keydown_SHIFT, checkTimes, textSFXPlaying, songEndScreenSkippable, mouseOverSong, paused, show_fade_in = true;
-int clearEnemies, curX, curY, monitorID, cancerCount, score, hitCount, gameFrameCount, durationInto, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1, nextVolumeSFXplay = -1, delayedSceneTimer = -1;
+boolean intense, allowDebugActions, cancerMode, keydown_SHIFT, checkTimes, songEndScreenSkippable, mouseOverSong, paused, show_fade_in = true;
+int patternTestLocIndex, patternTestVelIndex, curX, curY, monitorID, cancerCount, score, hitCount, gameFrameCount, durationInto, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1, nextVolumeSFXplay = -1, delayedSceneTimer = -1, clearEnemies = -1;
 float gameFrameRateTotal, scrollWait, fps_tracker, gameSelect_songSelect, gameSelectExtraYOffset, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, millisDelta, fadeDuration = 5000, fadeOpacityStart = 400, fadeOpacityEnd = 0, grayScaleTimer = 100, trailingAngle = 0, trailStrokeWeight = 4.5;
 String mapGenerationText, delayedSceneScene, settingsFileLoc, songDataFileLoc, previousScene, gameState = "title";
-int[] cancerKeys = { UP, UP, DOWN, DOWN, LEFT, RIGHT, LEFT, RIGHT, 66, 65, ENTER};
 RNG GFX_R, GAME_R;
 PVector pos, previousPos, randTrans, prevTrailLoc, screenSize, trailLoc, chroma_r, chroma_g, chroma_b;
 SFX[] soundList;
@@ -39,8 +37,9 @@ DecimalFormat timerFormat;
 ArrayList<bubble> bubbles = new ArrayList();
 ArrayList<songElement> songList = new ArrayList();
 ArrayList<floatingText> floatingPrompts = new ArrayList();
-HashMap <String, Long> timingList;
-HashMap <String, String> timingDisplay;
+ArrayList<timingDisplayElement> orderedTimingDisplay = new ArrayList(); 
+HashMap<String, Long> timingList;
+HashMap<String, timingDisplayElement> timingDisplay;
 arrow a;
 debugList msgList;
 settingButton[] settings, settings_left, settings_right;
@@ -56,6 +55,7 @@ songElement songP;
 //Constants
 final String SFX_PATH_PREFIX = "assets/SFX/";
 final float FIFTH_PI = 0.62831853071;
+final int[] cancerKeys = {UP, UP, DOWN, DOWN, LEFT, RIGHT, LEFT, RIGHT, 66, 65, ENTER};
 
 float findComplexity(float[] k) { //Variance calculation
     float adv = 0;
@@ -190,14 +190,15 @@ void fadeBack(float mul, int opacity) {
     rect(-5, -5, gameWidth + 10, gameHeight + 10);
 }
 
-void resetEnemies(int scoreDeduction, float time) {
+void resetEnemies(int scoreDeduction, float time, boolean isHit) {
     for(int i = gameMap.enemies.size() - 1; i >= 0; i--) {
         Enemy e = gameMap.enemies.remove(i);
-        PVector loc = e.previousLoc;
-        boolean isInside = (scoreDeduction > 0) && e.inField(gameMap, time);
-        if(isInside) score--;
-        if(DO_HIT_PROMPTS.state) {
-            floatingPrompts.add(new floatingText(loc.x, loc.y, 1500, str(-scoreDeduction - (isInside ? 1 : 0))));
+        if(isHit) {
+            boolean isInside = (scoreDeduction > 0) && e.inField(gameMap, time);
+            if(isInside) score--;
+            if(DO_HIT_PROMPTS.state) {
+                floatingPrompts.add(new floatingText(e.locCalc.x, e.locCalc.y, 1500, str(-scoreDeduction - (isInside ? 1 : 0))));
+            }
         }
     }
 }
@@ -517,6 +518,7 @@ void setup() {
     timerFormat.setMinimumIntegerDigits(2);
     timerFormat.setMinimumFractionDigits(4);
     msgList = new debugList(0, 0, 10000, 3000);
+    
 
     minim = new Minim(this);
     soundList = new SFX[] {
@@ -536,7 +538,7 @@ void setup() {
     color setting_default_f_active = #FF9999;
 
     volSlider = new vol_slider(gameWidth / 2, gameHeight / 1.175, 600, 35, 0, -30, 20, "Volume", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
-    difficultySlider = new difficulty_slider(1357, gameHeight * 4 / 5, 500, 35, songComplexity, 0.35, 1, "Difficulty", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
+    difficultySlider = new difficulty_slider(1357, gameHeight * 4 / 5, 500, 35, songComplexity, 0.5, 1.1, "Difficulty", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
     monitorOptions = new buttonMenu(165, 65, 200, 30, color(225), color(220), color(215), color(30), color(40), color(50));
     settings = new settingButton[] {
         DYNAMIC_BACKGROUND_COLOR = new settingButton(0, 0, 75, 75, 5, "Dynamic Background"  , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
@@ -827,7 +829,8 @@ void draw() {
         case "game": {
             noScoreTimer -= (60 / frameRate);
             TT("Physics");
-            float time = float(gameMap.song.position()) / 1000.0;
+            float time = gameMap.song.getTime();
+            float durationComplete = gameMap.song.getTimeFraction();
             
             previousPos.set(pos.x, pos.y);
             pos.set(curX, curY);
@@ -964,17 +967,15 @@ void draw() {
             a.drawHead(g, 0);
             noStroke();
             
-            //draw player
-            gameMap.drawPlayer(g, pos, curX, curY);
-
             //draw field
             pushMatrix();
             if(intense) translate(randTrans.x, randTrans.y);
-            strokeWeight(10);
-            stroke(255);
             gameMap.drawField(g, pos, curX, curY);
             popMatrix();
 
+            //draw player
+            gameMap.drawPlayer(g, pos, curX, curY);
+            
             //post processing
             if(DO_POST_PROCESSING.state) {
                 TT("PostProcessing");
@@ -993,7 +994,7 @@ void draw() {
                 PVector nextChroma_r, nextChroma_g, nextChroma_b;
                 PVector zeroVector = vec2();
                 if(intense) {
-                    if(c >= songComplexity) {
+                    if(c >= 0.5 + songComplexity) {
                         float offset = (2 * ((2 * c + 0.5) % 1) - 1) / 5;
                         float offset_y = GFX_R.rand(-c / 6, c / 6);
                         if(GFX_R.rand(0, 1) < 0.5) {
@@ -1036,8 +1037,17 @@ void draw() {
                 }
             }
 
+            if(DO_POST_PROCESSING.state) {
+                grayScaleTimer += 4 / frameRate;
+                float adjustedGrayScale = -0.8 * sq(grayScaleTimer) + 2.4 * grayScaleTimer;
+                if(adjustedGrayScale > 0.0) {
+                    grayScale.set("power", min(adjustedGrayScale, 0.75));
+                    filter(grayScale);
+                }
+            }
+
             colorMode(RGB);
-            fill(144, 227, 154);
+            fill(144, 200, 154);
             textSize(50);
             textAlign(LEFT, TOP);
             text("Score: " + score + "\n\n" + gameMap.enemies.size() + '\n' + time + '\n' + gameMap.getIntensityIndex(time) + '\n' + gameMap.getIntensity(time) + '\n' + gameMap.getIntegralVal(gameMap.SPS *  time), 10, 0);
@@ -1049,7 +1059,7 @@ void draw() {
                 text(songP.title, 10, gameHeight - 10);
             }
 
-            float durationComplete = ((float)gameMap.song.position()) / gameMap.song.sound.length();
+            //Duration bar
             rectMode(CORNERS);
             noStroke();
             fill(255);
@@ -1057,19 +1067,10 @@ void draw() {
             fill(64);
             rect(gameWidth * durationComplete, gameHeight - 4, gameWidth, gameHeight);
 
-            textFont(defaultFont);
 
-            if(DO_POST_PROCESSING.state) {
-                grayScaleTimer += 4 / frameRate;
-                float adjustedGrayScale = -0.8 * sq(grayScaleTimer) + 2.4 * grayScaleTimer;
-                if(adjustedGrayScale > 0.0) {
-                    grayScale.set("power", min(adjustedGrayScale, 0.75));
-                    filter(grayScale);
-                }
-            }
 
             if(clearEnemies != -1) { //Used to avoid concurrentmodificationexception when clearing enemies when their drawn
-                resetEnemies(clearEnemies, time);
+                resetEnemies(clearEnemies, time, true);
                 clearEnemies = -1;
             }
 
@@ -1079,8 +1080,7 @@ void draw() {
                         gainScore.play();
                         for(int i = gameMap.enemies.size() - 1; i > -1; i--) {
                             Enemy enemy = gameMap.enemies.get(i);
-                            PVector enemyLoc = enemy.getLoc(time);
-                            floatingPrompts.add(new floatingText(enemyLoc.x, enemyLoc.y, 1500, "+1"));
+                            floatingPrompts.add(new floatingText(enemy.locCalc.x, enemy.locCalc.y, 1500, "+1"));
                             gameMap.enemies.remove(i);
                             score++;
                         }
@@ -1091,7 +1091,6 @@ void draw() {
                 }else if(adjMillis() > levelSummary_timer) {
                     levelSummary_timer = 0;
                     setScene("levelSummary");
-                    textSFXPlaying = false;
                     screenshot();
                 }
             }
@@ -1181,14 +1180,7 @@ void draw() {
             int adjustedHitCount = int(cNorm(durationInto, hitCountStart, hitCountEnd) * hitCount);
 
             boolean playSound = (score > 0 && durationInto > scoreTickStart && durationInto < scoreTickEnd) || (hitCount > 0 && durationInto > hitCountStart && durationInto < hitCountEnd);
-            if(!textSFXPlaying && playSound) { //Because .isPlaying() returns false for a second after it loops
-                textSFXPlaying = true;
-                if(!textSFX.isPlaying()) textSFX.play();
-            }
-            if(textSFXPlaying && !playSound) {
-                textSFXPlaying = false;
-                textSFX.stop();
-            }
+            if(playSound && !textSFX.isPlaying()) textSFX.play();
 
             activeCursor = ARROW;
             background(0);
@@ -1227,7 +1219,15 @@ void draw() {
         }
     }
 
+    
     { //Overlays
+        TT("Debug Overlays");
+        
+        if(checkTimes) {
+            orderedTimingDisplay = new ArrayList<timingDisplayElement>(timingDisplay.values());
+            orderedTimingDisplay.sort(new timingDisplaySorter());
+        }
+        
         float timing_rectWidth = 400;
         float timing_textFontSize = 18;
         float timing_topPadding = 75;
@@ -1235,49 +1235,51 @@ void draw() {
         float timing_textPaddingSides = 5;
         float timing_textPaddingVertical = 2;
         float timing_adjTextHeight = timing_textFontSize + timing_textPaddingVertical;
-        float timing_rectHeight = timingDisplay.size() * timing_adjTextHeight + timing_textPaddingVertical * 3;
+        float timing_rectHeight = orderedTimingDisplay.size() * timing_adjTextHeight + timing_textPaddingVertical * 3;
         float timing_y = timing_textPaddingVertical + timing_topPadding;
         if(TIMING_INFO.state) { //Timing info
             fill(0, 64);
             noStroke();
             rectMode(CORNER);
-            if(timingDisplay.size() > 0) {
+            if(orderedTimingDisplay.size() > 0) {
                 rect(gameWidth - timing_rectWidth - timing_rightPadding, timing_topPadding, timing_rectWidth, timing_rectHeight);
                 textFont(defaultFont, timing_textFontSize);
                 fill(255);
                 int i = 0;
-                for(Map.Entry < String, String > entry: timingDisplay.entrySet()) {
+                for(timingDisplayElement e : orderedTimingDisplay) {
                     textAlign(LEFT, TOP);
-                    text(entry.getKey(), gameWidth - timing_rightPadding + timing_textPaddingSides - timing_rectWidth, timing_y);
+                    text(e.name, gameWidth - timing_rightPadding + timing_textPaddingSides - timing_rectWidth, timing_y);
                     textAlign(RIGHT, TOP);
-                    text(entry.getValue(), gameWidth - timing_rightPadding - timing_textPaddingSides, timing_y);
+                    text(e.display, gameWidth - timing_rightPadding - timing_textPaddingSides, timing_y);
                     i++;
                     timing_y += timing_adjTextHeight;
                 }
             }
         }
         
-        textFont(defaultFont);
+        textFont(defaultFont, 15);
         if(DEBUG_INFO.state) { //Debug log
             msgList.x = gameWidth - 8;
             msgList.y = timing_y;
             msgList.draw(g);
         }
+        
         if(SHOW_FPS.state) { //FPS Tracker
             rectMode(CORNER);
             noStroke();
             fill(25, 128);
-            rect(gameWidth - 72, 2, 70, 35, 3);
+            rect(gameWidth - 73, 2, 67, 35, 3);
             float warnIntensity = clampMap(fps_tracker, 0, 120, 0, 255);
             fill(255, warnIntensity, warnIntensity);
             textAlign(LEFT, BOTTOM);
-            textSize(15);
+            textFont(defaultFont, 15);
             textLeading(15);
             gameFrameCount++;
             gameFrameRateTotal += frameRate;
             text("FPS: " + nf(min(999, round(fps_tracker)), 3) + "\nAdv: " + nf(min(999, round(gameFrameRateTotal / gameFrameCount)), 3), gameWidth - 70, 35);
             fps_tracker = lerp(fps_tracker, frameRate, 1 / frameRate);
         }
+        TT("Debug Overlays");
     }
     popMatrix();
 
@@ -1375,19 +1377,30 @@ void keyPressed(KeyEvent e) {
                     switch(keyCode) {
                         case UP: {
                             songComplexity += 0.1;
-                            logmsg("Increased song complexity");
+                            logmsg("Increased song complexity (%s)", );
                         } break;
                         case DOWN: {
                             songComplexity -= 0.1;
-                            logmsg("Decreased song complexity");
+                            logmsg("Decreased song complexity (%s)", );
+                        } break;
+                        case LEFT: {
+                            gameMap.song.skip(-15 * 1000);
+                            logmsg("Fowarded 15 seconds");
+                        } break;
+                        case RIGHT: {
+                            gameMap.song.skip( 15 * 1000);
+                            logmsg("Rewinded 15 seconds");
                         } break;
                         default: {
-                            if(key == ' ') {
-                                gameMap.song.skip(30 * 1000);
-                                logmsg("Fowarded 30 seconds");
-                            }else if(key == 'i') {
-                                NO_DAMAGE.state = !NO_DAMAGE.state;
-                                logmsg(NO_DAMAGE.state ? "Enabled invincibility." : "Disabled invincibility");
+                            switch(key) {
+                                case 'i': {
+                                    NO_DAMAGE.state = !NO_DAMAGE.state;
+                                    logmsg(NO_DAMAGE.state ? "Enabled invincibility." : "Disabled invincibility");
+                                } break;
+                                case 'g': {
+                                    gameMap.generateTestPattern("triangle", "90deg", gameMap.song.getTime() + 1);
+                                } break;
+                                case 
                             }
                         } break;
                     }

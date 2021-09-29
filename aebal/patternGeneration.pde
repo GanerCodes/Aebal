@@ -87,6 +87,7 @@ class ChainedTransformation {
     }
 }
 class EnemyPatternProperties {
+    int spawnMode;
     float difficulty, range, rotationSnapping;
     boolean disableRandomRotation, disableRotationStacking, evenSpacing;
     PVector distBounds, speedBounds, countBounds, scaleBounds, angleSweep;
@@ -97,19 +98,19 @@ class EnemyPatternProperties {
     }
     String toString() {
         return String.format(
-            "Difficulty: %s\n"+
-            "Parametric Angle Bounds: %s\n"+
-            "Implicit coordinate range: %s\n"+
-            "Rotation Snapping: %s\n"+
-            "Modifiers: [disableRandomRotation=%s, disableRotationStacking=%s, evenSpacing=%s]\n"+
-            "Default Transformations:%s\n"+
-            "Bounds:\n"+
-            "\tCount Bounds: %s\n"+
-            "\tSpeed Bounds: %s\n"+
-            "\tDist  Bounds: %s\n"+
-            "\tScale Bounds: %s\n",
-            difficulty, angleSweep, range, rotationSnapping, disableRandomRotation, disableRotationStacking, evenSpacing,
-            defaultTransformation.transformations.size() > 0 ? ('\n' + defaultTransformation.toString().replaceAll("(?m)^", "\t")) : " None", distBounds, speedBounds, countBounds, scaleBounds
+            "Difficulty: %s"+
+            "\nParametric Angle Bounds: %s"+
+            "\nImplicit coordinate range: %s"+
+            "\nRotation Snapping: %s"+
+            "\nModifiers: [spawnMode=%s, disableRandomRotation=%s, disableRotationStacking=%s, evenSpacing=%s]"+
+            "\nBounds:"+
+            "\n\tCount Bounds: %s"+
+            "\n\tSpeed Bounds: %s"+
+            "\n\tDist  Bounds: %s"+
+            "\n\tScale Bounds: %s"+
+            "\nDefault Transformations:%s",
+            difficulty, angleSweep, range, rotationSnapping, spawnMode, disableRandomRotation, disableRotationStacking, evenSpacing, countBounds, speedBounds, distBounds, scaleBounds,
+            (defaultTransformation.transformations.size() > 0 ? ('\n' + defaultTransformation.toString().replaceAll("(?m)^", "\t")) : " None")
         );
     }
 }
@@ -174,6 +175,9 @@ class EquationDifficultySorter implements Comparator<Equation> {
     }
 }
 
+String getPatternModeString(int mode) {
+    return mode == PatternSpawner.INTERCEPT_DEFAULT ? "INTERCEPT_DEFAULT" : (mode == PatternSpawner.INTERCEPT_ENTER ? "INTERCEPT_DEFAULT" : "INTERCEPT_EXIT");
+}
 class PatternSpawner {
     final static int INTERCEPT_DEFAULT = 0;
     final static int INTERCEPT_ENTER   = 1;
@@ -221,28 +225,29 @@ class PatternSpawner {
     //intensity  [0   - 1]
     //difficulty [0.1 - 1] ranges from 0.1 to 1.0; 0.1 = nearly zero chance of hard pattern; 1.0 = every pattern is the same 
     
-    ArrayList<Enemy> makePattern(GameMap gameMap, Equation spawnLocEq, Equation spawnVelEq, RNG rng, float time, float intensity, float difficulty, int intercept_mode) {
-        return generatePattern(spawnLocEq, (Equation2D)spawnVelEq, gameMap, rng, time, getWeighedRandom(rng, intensity, difficulty), intercept_mode);
+    ArrayList<Enemy> makePattern(GameMap gameMap, Equation spawnLocEq, Equation spawnVelEq, RNG rng, float time, float intensity, float difficulty) {
+        return generatePattern(spawnLocEq, (Equation2D)spawnVelEq, gameMap, rng, time, getWeighedRandom(rng, intensity, difficulty));
     }
-    ArrayList<Enemy> makePatternFromLocation(GameMap gameMap, Equation spawnLocEq, RNG rng, float time, float intensity, float difficulty, int intercept_mode) {
+    ArrayList<Enemy> makePatternFromLocation(GameMap gameMap, Equation spawnLocEq, RNG rng, float time, float intensity, float difficulty) {
         ArrayList<Equation2D> velEquationChoices = locIDVelMapping.get(spawnLocEq.ID);
-        Equation2D spawnVelEq = velEquationChoices.get(int(velEquationChoices.size() * getWeighedRandom(rng, intensity, difficulty)));
-        return makePattern(gameMap, spawnLocEq, spawnVelEq, rng, time, intensity, difficulty, intercept_mode);
+        int j = int(velEquationChoices.size() * getWeighedRandom(rng, intensity, difficulty));
+        Equation2D spawnVelEq = velEquationChoices.get(j);
+        return makePattern(gameMap, spawnLocEq, spawnVelEq, rng, time, intensity, difficulty);
     }
-    ArrayList<Enemy> makePatternFromLocation(GameMap gameMap, String locEqName, RNG rng, float time, float intensity, float difficulty, int intercept_mode) {
+    ArrayList<Enemy> makePatternFromLocation(GameMap gameMap, String locEqName, RNG rng, float time, float intensity, float difficulty) {
         Equation spawnLocEq = locIDMapping.get(locEqName);
-        return makePatternFromLocation(gameMap, spawnLocEq, rng, time, intensity, difficulty, intercept_mode);
+        return makePatternFromLocation(gameMap, spawnLocEq, rng, time, intensity, difficulty);
     }
-    ArrayList<Enemy> makePatternFromCategory(GameMap gameMap, String categoryName, RNG rng, float time, float intensity, float difficulty, int intercept_mode) {
+    ArrayList<Enemy> makePatternFromCategory(GameMap gameMap, String categoryName, RNG rng, float time, float intensity, float difficulty) {
         ArrayList<Equation> locEquationChoices = spawnCategories.get(categoryName);
         Equation spawnLocEq = locEquationChoices.get(int(locEquationChoices.size() * getWeighedRandom(rng, intensity, difficulty)));
-        return makePatternFromLocation(gameMap, spawnLocEq, rng, time, intensity, difficulty, intercept_mode);
+        return makePatternFromLocation(gameMap, spawnLocEq, rng, time, intensity, difficulty);
     }
-    ArrayList<Enemy> makePattern(GameMap gameMap, String locEqName, String velEqName, RNG rng, float time, float intensity, float difficulty, int intercept_mode) {
-        return makePattern(gameMap, locIDMapping.get(locEqName), (Equation2D)velIDMapping.get(velEqName), rng, time, intensity, difficulty, intercept_mode);
+    ArrayList<Enemy> makePattern(GameMap gameMap, String locEqName, String velEqName, RNG rng, float time, float intensity, float difficulty) {
+        return makePattern(gameMap, locIDMapping.get(locEqName), (Equation2D)velIDMapping.get(velEqName), rng, time, intensity, difficulty);
     }
     float getWeighedRandom(RNG rng, float intensity, float difficulty) {
-        return 1 - pow(rng.rand(), intensity * difficulty);
+        return constrain(1 - pow(rng.rand(), intensity * difficulty), 0, 0.9999);
     }
 
     Equation parsePattern(JSONObject pattern, String ID, boolean isVelocityPattern) throws Exception {        
@@ -290,6 +295,7 @@ class PatternSpawner {
         properties.scaleBounds = defaultParse(pattern, "scaleBounds", vec3(1));
         properties.speedBounds = defaultParse(pattern, "speedBounds", vec3(1));
         properties.rotationSnapping = jsonVal(pattern, "rotationSnapping", 0);
+        properties.spawnMode        = jsonVal(pattern, "spawnMode"       , 0);
         if(!isVelocityPattern) properties.range = jsonVal(pattern, "range", 1);
 
         if(!pattern.isNull("transform")) {
@@ -328,6 +334,7 @@ class PatternSpawner {
         }
 
         logmsg(equation.toShortString());
+        println(equation);
         return equation;
     }
     
@@ -389,7 +396,7 @@ class PatternSpawner {
         }
     }
 
-    ArrayList<Enemy> generatePattern(Equation locEq, Equation2D velEq, GameMap gameMap, RNG rng, float time, float iLerp, int intercept_mode) {
+    ArrayList<Enemy> generatePattern(Equation locEq, Equation2D velEq, GameMap gameMap, RNG rng, float time, float iLerp) {
         EnemyPatternProperties locationProps = locEq.spawnProperties;
         EnemyPatternProperties velocityProps = velEq.spawnProperties;
         ArrayList<PVector> locs = new ArrayList();
@@ -497,14 +504,14 @@ class PatternSpawner {
         }
 
         PVector locOffset = null;
-        if(intercept_mode != INTERCEPT_DEFAULT) {
+        if(locationProps.spawnMode != INTERCEPT_DEFAULT) {
             int middleIndex = locs.size() / 2;
             PVector loc = locs.get(middleIndex);
             PVector vel = vels.get(middleIndex);
             PVector adjustedGameSize = PVector.sub(gameMap.gameSize, vec2(GAME_MARGIN_SIZE * 2));
             locOffset = lineRectIntersectionPoint(loc, vel, adjustedGameSize, gameMap.gameCenter);
             locOffset = lineRectIntersectionPoint(locOffset, PVector.mult(vel, -1), adjustedGameSize, gameMap.gameCenter);
-            if(intercept_mode == INTERCEPT_EXIT) {
+            if(locationProps.spawnMode == INTERCEPT_EXIT) {
                 locOffset = lineRectIntersectionPoint(locOffset, vel, adjustedGameSize, gameMap.gameCenter);
             }
             locOffset.sub(loc);
@@ -526,7 +533,6 @@ class PatternSpawner {
                 }
             }
         }
-        
         return enemies;
     }   
 }

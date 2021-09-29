@@ -2,7 +2,7 @@ import java.util.Comparator;
 
 void setLoadingText(String s) {
     mapGenerationText = s + "...";
-    logmsg(s);
+    logmsg("Map Generation: " + s);
 }
 
 class GameMap {
@@ -56,7 +56,7 @@ class GameMap {
                 if(indx == samples.length) break;
                 buffer[o] = samples[i * SAMPLES_PER_SECOND + o];
             }
-            complexityArr[i] = findComplexity(buffer) * (1 + rootMeanSquare(buffer)) / 2;
+            complexityArr[i] = difficulty * findComplexity(buffer) * (1 + rootMeanSquare(buffer)) / 2;
         }
     }
     GameMap(String songName, String patternFileName, PVector gameSize, RNG rng, float difficulty) {
@@ -71,22 +71,26 @@ class GameMap {
         setLoadingText("Loading patterns...");
         spawner = new PatternSpawner(patternFileName);
         generateEnemies();
+        score = 0;
     }
     float[] generateVels() {
         float[] velArr = new float[SAMPLES_PER_SECOND * int(songDuration)];
         for(int i = 0; i < velArr.length; i++) {
-            velArr[i] = defaultSpeed + 1000 * (complexityArr[int(map(i, 0, velArr.length, 0, complexityArr.length))]);
+            velArr[i] = defaultSpeed * (1 + difficulty) + 3 * difficulty * SPS * complexityArr[int(map(i, 0, velArr.length, 0, complexityArr.length))];
         }
         return velArr;
     }
-    void createPattern(float time, float intensity, int intercept) {
-        enemies.addAll(spawner.makePatternFromCategory(this, "default", rng, time, 1, difficulty, intercept));
+    void createPattern(float time, float intensity) {
+        enemies.addAll(spawner.makePatternFromCategory(this, "default", rng, time, intensity, difficulty));
     }
-    void createPattern(String category, float time, float intensity, int intercept) {
-        enemies.addAll(spawner.makePatternFromCategory(this, category , rng, time, 1, difficulty, intercept));
+    void createPattern(String category, float time, float intensity) {
+        enemies.addAll(spawner.makePatternFromCategory(this, category , rng, time, intensity, difficulty));
     }
-    void createPatternFromLoc(String locEqName, float time, float intensity, int intercept) {
-        enemies.addAll(spawner.makePatternFromLocation(this, locEqName, rng, time, 1, difficulty, intercept));
+    void createPattern(String locEqName, String velEqName, float time, float intensity) {
+        enemies.addAll(spawner.makePattern(this, locEqName, velEqName, rng, time, intensity, difficulty));
+    }
+    void createPatternFromLoc(String locEqName, float time, float intensity) {
+        enemies.addAll(spawner.makePatternFromLocation(this, locEqName, rng, time, intensity, difficulty));
     }
     void addRecentEnemies(float time) {
         while(spawnIndex < enemySpawns.length && time >= enemySpawns[spawnIndex].spawnTime) {
@@ -100,6 +104,7 @@ class GameMap {
         for(int i = enemies.size() - 1; i >= 0; i--) {
             if(time >= enemies.get(i).despawnTime) {
                 enemies.remove(i);
+                score++;
             }
         }
     }
@@ -107,9 +112,14 @@ class GameMap {
         removeExpiredEnemies(time);
         addRecentEnemies(time);
     }
-    void resetEnemies() {
+    void resetEnemiesWithIndex() {
         spawnIndex = 0;
         enemies = new ArrayList<Enemy>();
+    }
+    void convertEnemiesToArray() {
+        enemies.sort(new enemySpawnTimeSorter());
+        enemySpawns = enemies.toArray(new Enemy[enemies.size()]);
+        resetEnemiesWithIndex();
     }
     int getIntensityIndex(float time) {
         return constrain(int(1000 * time * complexityArr.length / song.length()), 0, complexityArr.length - 1);
@@ -117,8 +127,17 @@ class GameMap {
     float getIntensity(float time) {
         return complexityArr[getIntensityIndex(time)];
     }
+    void generateTestPattern(String locName, String velName, float time) {
+        logf("Spawned \"%s\" pattern with velocity \"%s\" [t=%ss]", locName, velName, time);
+        resetEnemiesWithIndex();
+        for(int i = 0; i < complexityArr.length; i++) {
+            complexityArr[i] = 0.5;
+        }
+        createPattern(locName, velName, time, 1.0);
+        convertEnemiesToArray();
+    }
     void generateEnemies() {
-        resetEnemies();
+        resetEnemiesWithIndex();
 
         setLoadingText("Adjusting intensity...");
 
@@ -148,19 +167,19 @@ class GameMap {
 
         setLoadingText("Generating position integral...");
         generateIntegral(generateVels(), gameSize);
-
+        
         setLoadingText("Performing beat detection...");
-        float intensityScale = 1 / average + 2.25 * totalComplexity;
-        { //Beat detection [AIDS WARNING]
+        { //Beat detection [AIDS WARNING]        
             int minSeg = iSec / 3;
             int maxSeg = 5 * iSec;
             float spawnTimeDeltaRemoval = iSec / 8;
             int minConsecutiveBeats = 5;
-            int maxBeatDrift = minSeg / 6;
+            int maxBeatDrift = minSeg / 8;
             float thres0 = average + totalComplexity * 1; //Threshold for being a beat
-            float thres1 = average + totalComplexity * 3.5; //Threshold for being a heavy beat
+            float thres1 = average + totalComplexity * 1.1;// * 2.5; //Threshold for being a heavy beat
 
             IntList avoidTimings = new IntList();
+            IntList beatTimes = new IntList();
             for(int i = 0; i < complexityArr.length; i++) {
                 for(int o = minSeg; o < maxSeg; o++) {
                     IntList beats = new IntList();
@@ -188,21 +207,28 @@ class GameMap {
                         avoidTimings.append(beatTime);
                         if(invalidSpawn) continue;
 
-                        if(complexityArr[beatTime] < thres1) {
-                            createPattern("beat", beatTime * sampSecFactor, complexityArr[beatTime] * intensityScale, PatternSpawner.INTERCEPT_DEFAULT);
-                        }else{
-                            createPattern("heavyBeat", beatTime * sampSecFactor, complexityArr[beatTime] * intensityScale, PatternSpawner.INTERCEPT_ENTER);
-                        }
-                        enemies.add(createEnemy(vec2(gameSize.x, height / 2), vec2(1, 0), beatTime * sampSecFactor));
+                        beatTimes.append(beatTime);
                     }
-                    i += beatLength * 2;
+                    i += 1 + int(beatLength * 2.5);
                     break;
                 }
             }
+            
+            beatTimes.sort();
+            float r = -QUARTER_PI;
+            float lastHeavySpawnTime = 0;
+            for(int time : beatTimes) {
+                if(complexityArr[time] > thres1 && time - lastHeavySpawnTime > 2.0 * iSec) {
+                    createPattern("heavyBeat", time * sampSecFactor, complexityArr[time] * (1 + difficulty) / 2.0);
+                    lastHeavySpawnTime = time;
+                }else{
+                    enemies.add(createEnemy(vec2(gameDisplaySize.x / 2, gameDisplaySize.y / 2), vec2(1, 0).rotate(r), time * sampSecFactor));
+                }
+                r -= HALF_PI;
+            }
         }
-        enemies.sort(new enemySpawnTimeSorter());
-        enemySpawns = enemies.toArray(new Enemy[enemies.size()]);
-        enemies = new ArrayList<Enemy>();
+        
+        convertEnemiesToArray();
     }
     float findComplexity(float[] k) { //Variance calculation
         float adv = 0;
@@ -227,7 +253,7 @@ class GameMap {
     }
     float getIntegralVal(float val) {
         if(val >= integralArr.length) {
-            return integralArr[integralArr.length - 1] + (val - integralArr[integralArr.length - 1]) * defaultSpeed * dt;
+            return integralArr[integralArr.length - 1] + (val - integralArr.length) * defaultSpeed * dt;
         }else if(val < 0) {
             return val * defaultSpeed * dt;
         }else{
@@ -271,11 +297,11 @@ class GameMap {
     void updateField(PVector playerPos, float time, int mouseX, int mouseY) {
         field.update(playerPos, getIntensity(time), mouseX, mouseY);
     }
-    void drawField(PGraphics base, PVector pos, int mouseX, int mouseY) {
-        field.draw(base, pos, mouseX, mouseY);
-    }
     void drawPlayer(PGraphics base, PVector pos, int mouseX, int mouseY) {
         field.drawPlayer(base, pos, mouseX, mouseY);
+    }
+    void drawField(PGraphics base, PVector pos, int mouseX, int mouseY) {
+        field.draw(base, pos, mouseX, mouseY);
     }
     void drawEnemies(PGraphics base, float time, PVector pos, color enemyColor, boolean fancy) {
         base.noStroke();

@@ -293,6 +293,9 @@ color lerpColors(float v, color... colors) {
     return lerpColor(colors[indx], colors[indx + 1], v % 1.0);
 }
 
+int     jsonVal(JSONObject json, String key, int     alternate) {
+    return json.isNull(key) ? alternate : json.getInt    (key);
+}
 float   jsonVal(JSONObject json, String key, float   alternate) {
     return json.isNull(key) ? alternate : json.getFloat  (key);
 }
