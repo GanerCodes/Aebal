@@ -162,9 +162,17 @@ void unpause(boolean setFPS) {
 }
 
 void loadSong() {
-    mapGenerationText = "Loading...";
+    mapGenerationText = "Loading";
     logmsg("Song complexity: " + str(songComplexity));
-    gameMap = new GameMap(songP.fileName, sketchPath("patterns.json"), screenSize, GAME_R, songComplexity);
+    try {
+        gameMap = new GameMap(songP.fileName, sketchPath("patterns.json"), screenSize, GAME_R, songComplexity);
+    }catch(Throwable t) {
+        logf("Error in song load! \"%s\"", t);
+        mapGenerationText = "";
+        setSceneDelay("gameSelect", 3500);
+        fadeOpacityStart = 255;
+        fadeDuration = 500;
+    }
     logmsg(String.format("Song arr length: %s; SPS: %s", gameMap.complexityArr.length, gameMap.complexityArr.length / (gameMap.song.length() / 1000.0)));
     gameMap.song.setVol(volSlider.val);
     gameMap.song.play();
@@ -237,14 +245,14 @@ void selectLevel(songElement song) {
             selectInput("Select a music file:", "songSelected");
         } break;
         case "///download": {
-            setScene("load_long");
+            setScene("load_download");
             fadeOpacityStart = 128;
             fadeDuration = 128;
             songDownloadProcess = tryDownloadFromClipboard();
         } break;
         default: {
             songP = song;
-            setScene("loading");
+            setScene("load_song");
             resetLevel();
             bubbles = new ArrayList();
             floatingPrompts = new ArrayList();
@@ -1138,14 +1146,17 @@ void draw() {
                 nextVolumeSFXplay = -1;
             }
         } break;
-        case "loading": {
+        case "load_song": {
+            activeCursor = ARROW;
             background(0);
             fill(255);
             textFont(songFont, 60);
             textAlign(CENTER, CENTER);
-            text(mapGenerationText + '\n' + durationInto, gameWidth / 2, gameHeight / 2);
+            String msg = (mapGenerationText.length() > 0 ? (mapGenerationText + ".....".substring(5 - (int(millis() / 500.0) % 5))) : "Error loading song!");
+            
+            text(msg, gameWidth / 2, gameHeight / 2);
         } break;
-        case "load_long": {
+        case "load_download": {
             activeCursor = ARROW;
             background(0);
             loading_animation.set("u_time", millis() / 1000.0);
@@ -1334,7 +1345,7 @@ void keyPressed(KeyEvent e) {
 
     if(key == ESC) {
         key = 0;
-        if(gameState.equals("levelSummary") || ((gameState.equals("game") || gameState.equals("pause") || gameState.equals("settings") || gameState.equals("load_long")) && keydown_SHIFT)) {
+        if(gameState.equals("levelSummary") || ((gameState.equals("game") || gameState.equals("pause") || gameState.equals("settings") || gameState.equals("load_download") || gameState.equals("load_song")) && keydown_SHIFT)) {
             gotoLevelSelect();
         }else{
             switch(gameState) {

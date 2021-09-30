@@ -461,10 +461,7 @@ class PatternSpawner {
                     PVector loc = locationProps.defaultTransformation.apply(parEq.getVal(0, 0, t));
                     locs.add(loc);
                     vels.add(velocityProps.defaultTransformation.apply(velEq.getVal(loc.x, loc.y, t)));
-                    printf("(%s, %s)", loc.x, loc.y);
                 }
-                println();
-                for(PVector p : vels) printf("(%s, %s)", p.x, p.y);
             }
         }else if(locEq.type == Equation.IMPLICIT) {
             Equation1D impEq = (Equation1D)locEq;
@@ -517,6 +514,11 @@ class PatternSpawner {
         }
 
         int spawnMode = velocityProps.spawnMode == -1 ? locationProps.spawnMode : velocityProps.spawnMode;
+        if(spawnMode == 3) {
+            spawnMode = int(rng.random(3));
+        }else if(spawnMode == 4) {
+            spawnMode = rng.randBool() ? 1 : 2;
+        }
         PVector locOffset = null;
         if(spawnMode != INTERCEPT_DEFAULT) {
             int middleIndex = locs.size() / 2;

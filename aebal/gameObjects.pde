@@ -39,7 +39,7 @@ class Enemy {
             base.strokeCap(SQUARE);
             base.line(locCalc.x, locCalc.y, currentLoc.x, currentLoc.y);
         }
-        if(clearEnemies == -1 && currentLoc.x > pos.x - 20 && currentLoc.x < pos.x + 20 && currentLoc.y > pos.y - 20 && currentLoc.y < pos.y + 20) {
+        if(clearEnemies == -1 && ) {//currentLoc.x > pos.x - 20 && currentLoc.x < pos.x + 20 && currentLoc.y > pos.y - 20 && currentLoc.y < pos.y + 20) {
             gotHit(getOnScreenObjCount(), 30, 1, time);
         }
         locCalc = currentLoc;

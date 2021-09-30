@@ -1,7 +1,7 @@
 import java.util.Comparator;
 
 void setLoadingText(String s) {
-    mapGenerationText = s + "...";
+    mapGenerationText = s;
     logmsg("Map Generation: " + s);
 }
 
@@ -84,14 +84,11 @@ class GameMap {
         }
         return velArr;
     }
-    void createPattern(float time, float intensity) {
-        enemies.addAll(spawner.makePatternFromCategory(this, "default", rng, time, intensity, difficulty));
-    }
     void createPattern(String category, float time, float intensity) {
         enemies.addAll(spawner.makePatternFromCategory(this, category , rng, time, intensity, difficulty));
     }
     void createPattern(String locEqName, String velEqName, float time, float intensity) {
-        enemies.addAll(spawner.makePattern(this, locEqName, velEqName, rng, time, intensity, difficulty));
+        enemies.addAll(spawner.makePattern(this, locEqName , velEqName, rng, time, intensity, difficulty));
     }
     void createPatternFromLoc(String locEqName, float time, float intensity) {
         enemies.addAll(spawner.makePatternFromLocation(this, locEqName, rng, time, intensity, difficulty));
@@ -170,6 +167,26 @@ class GameMap {
         setLoadingText("Generating position integral");
         generateIntegral(generateVels(), gameSize);
         
+        IntList avoidTimings = new IntList();
+        
+        setLoadingText("Adding random enemies");
+        { //Randomish enemies
+            float spawnTime = 1;
+            for(int i = 0; i < complexityArr.length; i++) {
+                float c = complexityArr[i];
+                float ct = i * sampSecFactor;
+                if(ct >= spawnTime && c > average - totalComplexity / 1.25) {
+                    float r = rng.rand() * c * 1.25;
+                    if(rng.rand() + c > 0.5) createPattern("common", ct, c);
+                    if(r > 0.325 && rng.randProp(0.25 + (difficulty - 0.25))) {
+                        createPattern("default", ct, c);
+                        spawnTime += 1.8 - difficulty - c / 3.25;
+                    }
+                    spawnTime += 1 / (0.4 * (pow(difficulty, 1.35) + 2 * c)) + max(0, 2 * (1 - difficulty));
+                    avoidTimings.append(i);
+                }
+            }
+        }
         setLoadingText("Performing beat detection");
         { //Beat detection [AIDS WARNING]        
             int minSeg = iSec / 3;
@@ -180,7 +197,6 @@ class GameMap {
             float thres0 = average + totalComplexity * 1; //Threshold for being a beat
             float thres1 = average + totalComplexity * 2.5;// * 2.5; //Threshold for being a heavy beat
 
-            IntList avoidTimings = new IntList();
             IntList beatTimes = new IntList();
             for(int i = 0; i < complexityArr.length; i++) {
                 for(int o = minSeg; o < maxSeg; o++) {
@@ -224,7 +240,7 @@ class GameMap {
                     createPattern("heavyBeat", time * sampSecFactor, complexityArr[time] * (1 + difficulty) / 2.0);
                     lastHeavySpawnTime = time;
                 }else{
-                    enemies.add(createEnemy(vec2(gameDisplaySize.x / 2, gameDisplaySize.y / 2), vec2(1, 0).rotate(r), time * sampSecFactor));
+                    enemies.add(createEnemy(vec2(gameDisplaySize.x / 2, gameDisplaySize.y / 2), vec2((1 + difficulty) / 2, 0).rotate(r), time * sampSecFactor));
                 }
                 r -= HALF_PI;
             }
