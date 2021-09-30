@@ -43,7 +43,7 @@ class GameMap {
         float[] leftSamples  = songRaw.getChannel(AudioSample.LEFT );
         float[] rightSamples = songRaw.getChannel(AudioSample.RIGHT);
         float[] samples = new float[rightSamples.length];
-        for(int i = 0; i < leftSamples.length; i++) samples[i] = 0.5 * (leftSamples[i] + rightSamples[i]);
+        for(int i = 0; i < leftSamples.length; i++) samples[i] = 0.001 + 0.5 * (leftSamples[i] + rightSamples[i]);
 
         formCount = samples.length / SAMPLES_PER_SECOND;
         songDuration = song.length() / 1000.0;
@@ -191,11 +191,11 @@ class GameMap {
         { //Beat detection [AIDS WARNING]        
             int minSeg = iSec / 3;
             int maxSeg = 5 * iSec;
-            float spawnTimeDeltaRemoval = iSec / 8;
             int minConsecutiveBeats = 5;
             int maxBeatDrift = minSeg / 8;
-            float thres0 = average + totalComplexity * 1; //Threshold for being a beat
-            float thres1 = average + totalComplexity * 2.5;// * 2.5; //Threshold for being a heavy beat
+            float spawnTimeDeltaRemoval = iSec / 8;
+            float thres0 = average + totalComplexity * 1.0;
+            float thres1 = average + totalComplexity * 2.5;
 
             IntList beatTimes = new IntList();
             for(int i = 0; i < complexityArr.length; i++) {
@@ -208,9 +208,7 @@ class GameMap {
                         beats.append(i + t);
                         int optimalLocOffset = findLocalMaxOffset(complexityArr, i + t + beatLength, maxBeatDrift);
                         overallOffset += optimalLocOffset;
-                        if(overallOffset < maxBeatDrift && maxBeatDrift > -maxBeatDrift) {
-                            beatLength += optimalLocOffset;
-                        }
+                        // if(overallOffset < maxBeatDrift && maxBeatDrift > -maxBeatDrift / 3) beatLength += optimalLocOffset;
                         t += beatLength;
                     }
                     if(beats.size() < minConsecutiveBeats) continue;
@@ -236,7 +234,7 @@ class GameMap {
             float r = -QUARTER_PI;
             float lastHeavySpawnTime = 0;
             for(int time : beatTimes) {
-                if(complexityArr[time] > thres1 && time - lastHeavySpawnTime > 2.0 * iSec) {
+                if(complexityArr[time] > thres1 && time - lastHeavySpawnTime > 1.5 * iSec) {
                     createPattern("heavyBeat", time * sampSecFactor, complexityArr[time] * (1 + difficulty) / 2.0);
                     lastHeavySpawnTime = time;
                 }else{
@@ -321,8 +319,23 @@ class GameMap {
     void drawField(PGraphics base, PVector pos, int mouseX, int mouseY) {
         field.draw(base, pos, mouseX, mouseY);
     }
-    void drawEnemies(PGraphics base, float time, PVector pos, color enemyColor, boolean fancy) {
+    void drawEnemies(PGraphics base, float time, PVector pos, PVector previousPos, color enemyColor, boolean fancy) {
+        if(fancy) {
+            base.strokeCap(SQUARE);
+            base.strokeWeight(20);
+            base.stroke(enemyColor);
+            base.noFill();
+            base.beginShape(LINES);
+        }
+        for(Enemy e : enemies) {
+            e.update(base, time, pos, previousPos, enemyColor, fancy);
+        }
+        if(fancy) base.endShape();
+        
         base.noStroke();
-        for(Enemy e : enemies) e.draw(base, time, pos, enemyColor, fancy);
+        base.fill(enemyColor);
+        for(Enemy e : enemies) {
+            base.circle(e.locCalc.x, e.locCalc.y, 20);
+        }
     }
 }

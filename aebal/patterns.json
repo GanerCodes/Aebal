@@ -93,7 +93,7 @@
             "transform": [
                 {"scale": "0.23"}
             ],
-            "countBounds": "18, 23",
+            "countBounds": "16, 23",
             "scaleBounds": "0.5, 0.8",
             "distBounds": "0, 0.6",
             "speedBounds": "0.4, 0.6",
@@ -125,7 +125,7 @@
             "equationX": "cos(t)",
             "equationY": "sin(t)",
             "distBounds": "0, 0.25",
-            "speedBounds": "0.4, 0.6"
+            "speedBounds": "0.4, 0.6",
         },
         "hourglass": {
             "velChoices": ["90deg", "linearShrink", "crissCross", "shrinker"],
@@ -133,7 +133,8 @@
             "equationX": "(cos(t)*sin(t))/max(abs(cos(t)), abs(sin(t)))",
             "equationY": "(sin(t))/max(abs(cos(t)), abs(sin(t)))",
             "speedBounds": "0.4, 0.6",
-            "countBounds": "0.5, 0.8"
+            "scaleBounds": "0.5, 0.8",
+            "countBounds": "18, 23"
         },
         "field": {
             "velChoices": ["linearUp"],

@@ -56,3 +56,23 @@ boolean rectIntersection(PVector loc, PVector s, PVector a, PVector b) { //Corne
     lineIntersection(new PVector(loc.x + s.x, loc.y + s.y), new PVector(loc.x      , loc.y + s.y), a, b) || 
     lineIntersection(new PVector(loc.x      , loc.y + s.y), new PVector(loc.x      , loc.y      ), a, b);
 }
+boolean quadLineSquareIntersection(PVector a1, PVector a2, PVector b1, PVector b2, float s) { //1000% sure there is some fancy way to do this like I did with a bunch of the simpler stuff but I can't be asked rn
+    if((a1.x == a2.x && a1.y == a2.y) || (b1.x == b2.x && b1.y == b2.y)) return false;
+    
+    s *= 0.5;
+    PVector[] corners = new PVector[] {
+        new PVector( s,  s),
+        new PVector( s, -s),
+        new PVector(-s,  s),
+        new PVector(-s, -s)
+    };
+    for(PVector c1 : corners) {
+        for(PVector c2 : corners) {
+            if(lineIntersection(
+                PVector.add(a1, c1), PVector.add(a2, c1),
+                PVector.add(b1, c2), PVector.add(b2, c2)
+            )) return true;
+        }
+    }
+    return false;
+}

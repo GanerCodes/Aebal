@@ -962,7 +962,7 @@ void draw() {
                 back.noStroke();
             }
             TT("Enemies");
-            gameMap.drawEnemies(back, time, pos, globalObjColor, BACKGROUND_FADE.state);
+            gameMap.drawEnemies(back, time, pos, previousPos, globalObjColor, BACKGROUND_FADE.state);
             TT("Enemies");
             a.drawHead(back, 128);
             back.endDraw();
