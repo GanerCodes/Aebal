@@ -2,6 +2,9 @@
 //      0: Default
 //      1: Enter
 //      2: Exit
+// Notes:
+//  Modifiers are: evenSpacing, disableEvenSpacing, disableRandomRotation, disableRotationStacking 
+//  SpawnMode [if set] in velocity overwrites location spawnMode when spawning with that velocity
 
 //   | {
 // * |     "location": {
@@ -39,7 +42,7 @@
         "solidTriangle": {
             "difficulty": 0,
             "velChoices": ["linearUp"],
-            "categories": ["default", "heavyBeat"],
+            "categories": ["heavyBeat"],
             "spawnMode": 1,
             "equation": "abs(y + abs(x)) + abs(x) - 1",
             "range": 1.05,
@@ -62,19 +65,19 @@
         },
         "solidSquare": {
             "difficulty": 0,
-            "velChoices": ["linearUp"],
-            "categories": ["default", "heavyBeat"],
+            "velChoices": ["linearUp", "crissCross"],
+            "categories": ["heavyBeat"],
             "spawnMode": 1,
             "equation": "-1",
             "range": 1,
             "countBounds": "7.5, 11",
             "scaleBounds": "0.5, 0.9",
             "speedBounds": "0.5",
-            "distBounds": "0.25, 0.5"
+            "distBounds": "0.35, 0.55"
         },
         "triangle": {
             "velChoices": ["90deg", "linearShrink", "crissCross"],
-            "categories": ["heavyBeat"],
+            "categories": ["default", "heavyBeat"],
             "equationX": "cos(t)/(abs(sin(t)+abs(cos(t)))+abs(cos(t)))",
             "equationY": "sin(t)/(abs(sin(t)+abs(cos(t)))+abs(cos(t)))",
             "distBounds": "0, 0.25",
@@ -83,7 +86,7 @@
         },
         "circle": {
             "velChoices": ["90deg", "linearShrink", "crissCross"],
-            "categories": ["heavyBeat"],
+            "categories": ["default", "heavyBeat"],
             "equationX": "cos(t)",
             "equationY": "sin(t)",
             "distBounds": "0, 0.25",
@@ -99,32 +102,31 @@
             "distBounds": "0, 0.075"
         },
         "hourglass": {
-            "velChoices": ["90deg", "linearShrink", "crissCross"],
+            "velChoices": ["90deg", "linearShrink", "crissCross", "shrinker"],
             "categories": ["default", "heavyBeat"],
             "equationX": "(cos(t)*sin(t))/max(abs(cos(t)), abs(sin(t)))",
             "equationY": "(sin(t))/max(abs(cos(t)), abs(sin(t)))",
             "speedBounds": "0.4, 0.6"
         },
         "square": {
-            "velChoices": ["90deg", "linearShrink", "crissCross"],
+            "velChoices": ["90deg", "linearShrink", "crissCross", "shrinker"],
             "categories": ["default", "heavyBeat"],
             "equationX": "cos(t)/max(abs(cos(t)), abs(sin(t)))",
             "equationY": "sin(t)/max(abs(cos(t)), abs(sin(t)))",
-            "modifiers": ["disableRandomRotation"],
-            "angleBounds": "-pi, pi"
-            // "distBounds": "0, 0.25",
-            // "speedBounds": "0.4, 0.6",
-            // "modifiers": ["evenSpacing"]
+            "distBounds": "0, 0.25",
+            "speedBounds": "0.4, 0.6",
+            "modifiers": ["evenSpacing"]
         },
     },
     "velocity": {
         "crissCross": {
+            "difficulty": 1,
             "equationX": "cos(t + pi / 2)",
-            "equationY": "sin(t + pi / 2)",
-            "countBounds": "5",
-            "modifiers": ["disableRandomRotation", "disableRotationStacking"]
-            // "speedBounds": "0.8, 1.2",
-            // "countBounds": "0.5, 0.8",
+            "equationY": "-sin(t + pi / 2)",
+            "spawnMode": 0,
+            "modifiers": ["disableRandomRotation", "disableRotationStacking"],
+            "speedBounds": "0.75, 0.9",
+            "countBounds": "0.5, 0.8"
         },
         "linearUp": {
             "equationX": "0",
@@ -132,18 +134,17 @@
             "speedBounds": "0.75, 1.75",
             "modifiers": ["disableRandomRotation"]
         },
+        "shrinker": {
+            "equationX": "1",
+            "equationY": "sin(t)*cos(t)/2",
+            "countBonds": "0.45, 0.7"
+        },
         "linearShrink": {
             "equationX": "0",
             "equationY": "1",
             "speedBounds": "1, 2.15",
             "scaleBounds": "0.14, 0.65",
             "modifiers": ["disableRandomRotation"]
-        },
-        "constDiag": {
-            "equationX": "1",
-            "equationY": "1",
-            "rotationSnapping": 4,
-            "modifiers": ["disableRotationStacking"]
         },
         "90deg": {
             "equationX": "cos(atan2(y, x) + pi / 2)",

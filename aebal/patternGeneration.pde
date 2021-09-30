@@ -302,7 +302,7 @@ class PatternSpawner {
         properties.scaleBounds = defaultParse(pattern, "scaleBounds", vec3(1));
         properties.speedBounds = defaultParse(pattern, "speedBounds", vec3(1));
         properties.rotationSnapping = jsonVal(pattern, "rotationSnapping", 0);
-        properties.spawnMode        = jsonVal(pattern, "spawnMode"       , 0);
+        properties.spawnMode        = jsonVal(pattern, "spawnMode"       , isVelocityPattern ? -1 : 0);
         if(!isVelocityPattern) properties.range = jsonVal(pattern, "range", 1);
 
         if(!pattern.isNull("transform")) {
@@ -324,6 +324,7 @@ class PatternSpawner {
                 }
             }
         }
+        if(isVelocityPattern) properties.evenSpacing = true;
         if(!pattern.isNull("modifiers")) {
             for(String s : pattern.getJSONArray("modifiers").getStringArray()) {
                 switch(s) {
@@ -335,7 +336,10 @@ class PatternSpawner {
                     } break;
                     case "evenSpacing": {
                         properties.evenSpacing = true; 
-                    }
+                    } break;
+                    case "disableEvenSpacing": {
+                        properties.evenSpacing = false;
+                    } break;
                 }
             }
         }
@@ -425,7 +429,7 @@ class PatternSpawner {
         if(velocityProps.rotationSnapping > 0) velRotation = roundArbitrary(velRotation, TWO_PI / velocityProps.rotationSnapping);
         if(locEq.type == Equation.PARAMETRIC) {
             Equation2D parEq = (Equation2D)locEq;
-            if(locationProps.evenSpacing) {
+            if(locationProps.evenSpacing && velocityProps.evenSpacing) {
                 int precision = 1000;
                 if(parEq.distanceIntegral == null) {
                     parEq.distanceIntegral = new float[precision];
@@ -457,7 +461,10 @@ class PatternSpawner {
                     PVector loc = locationProps.defaultTransformation.apply(parEq.getVal(0, 0, t));
                     locs.add(loc);
                     vels.add(velocityProps.defaultTransformation.apply(velEq.getVal(loc.x, loc.y, t)));
+                    printf("(%s, %s)", loc.x, loc.y);
                 }
+                println();
+                for(PVector p : vels) printf("(%s, %s)", p.x, p.y);
             }
         }else if(locEq.type == Equation.IMPLICIT) {
             Equation1D impEq = (Equation1D)locEq;
@@ -496,28 +503,29 @@ class PatternSpawner {
             PVector loc = locs.get(i);
             PVector vel = vels.get(i);
             if(vel.mag() <= 0.01) {
-                logmsg(String.format("Enemy was excluded for having low or zero velocity: [t=%ss] ([%s, %s], [%s, %s])", time, loc.x, loc.y, vel.x, vel.y));
+                // logmsg(String.format("Enemy was excluded for having low or zero velocity: [t=%ss] ([%s, %s], [%s, %s])", time, loc.x, loc.y, vel.x, vel.y));
                 continue;
             }
             
             loc.mult(gameMap.field.minCenterSize / 3.0).add(gameMap.gameCenter).add(locDistAdj);
             if(!velRectIntersection(loc, vel, gameMap.gameSize, gameMap.gameCenter)) {
-                logmsg(String.format("Enemy was excluded for having no intersection with play area: [t=%ss] ([%s, %s], [%s, %s])", time, loc.x, loc.y, vel.x, vel.y));
+                // logmsg(String.format("Enemy was excluded for having no intersection with play area: [t=%ss] ([%s, %s], [%s, %s])", time, loc.x, loc.y, vel.x, vel.y));
                 continue;
             }
 
             enemies.add(new Enemy(loc, vel));
         }
 
+        int spawnMode = velocityProps.spawnMode == -1 ? locationProps.spawnMode : velocityProps.spawnMode;
         PVector locOffset = null;
-        if(locationProps.spawnMode != INTERCEPT_DEFAULT) {
+        if(spawnMode != INTERCEPT_DEFAULT) {
             int middleIndex = locs.size() / 2;
             PVector loc = locs.get(middleIndex);
             PVector vel = vels.get(middleIndex);
             PVector adjustedGameSize = PVector.sub(gameMap.gameSize, vec2(GAME_MARGIN_SIZE * 2));
             locOffset = lineRectIntersectionPoint(loc, vel, adjustedGameSize, gameMap.gameCenter);
             locOffset = lineRectIntersectionPoint(locOffset, PVector.mult(vel, -1), adjustedGameSize, gameMap.gameCenter);
-            if(locationProps.spawnMode == INTERCEPT_EXIT) {
+            if(spawnMode == INTERCEPT_EXIT) {
                 locOffset = lineRectIntersectionPoint(locOffset, vel, adjustedGameSize, gameMap.gameCenter);
             }
             locOffset.sub(loc);
@@ -534,7 +542,7 @@ class PatternSpawner {
                 enemies.set(i, e);
                 
                 if(e.spawnTime < 0 && !disableNegativeSpawnTimeExclusion) {
-                    logmsg(String.format("Enemy was excluded for being on screen at song start: [t=%ss] (%s)", time, e));
+                    // logmsg(String.format("Enemy was excluded for being on screen at song start: [t=%ss] (%s)", time, e));
                     enemies.remove(i);
                 }
             }

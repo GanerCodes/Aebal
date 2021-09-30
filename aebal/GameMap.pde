@@ -178,7 +178,7 @@ class GameMap {
             int minConsecutiveBeats = 5;
             int maxBeatDrift = minSeg / 8;
             float thres0 = average + totalComplexity * 1; //Threshold for being a beat
-            float thres1 = average + totalComplexity * 1.1;// * 2.5; //Threshold for being a heavy beat
+            float thres1 = average + totalComplexity * 2.5;// * 2.5; //Threshold for being a heavy beat
 
             IntList avoidTimings = new IntList();
             IntList beatTimes = new IntList();
