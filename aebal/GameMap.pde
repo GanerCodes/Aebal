@@ -77,6 +77,17 @@ class GameMap {
         generateEnemies();
         score = 0;
     }
+    void drawIntensityGraph(PGraphics base) {
+        base.beginDraw();
+        base.strokeCap(SQUARE);
+        base.strokeWeight(1);
+        base.stroke(255, 0, 0, 128);
+        for(int i = 0; i < base.width; i++) {
+            float v = 100 * complexityArr[int(map(i, 0, base.width + 1, 0, complexityArr.length))];
+            base.line(i, base.height, i, base.height - v);
+        }
+        base.endDraw();
+    }
     float[] generateVels() {
         float[] velArr = new float[SAMPLES_PER_SECOND * int(songDuration)];
         for(int i = 0; i < velArr.length; i++) {
@@ -157,8 +168,8 @@ class GameMap {
         for(int i = 0; i < complexityArr.length; i++) {
             float c = complexityArr[i] + boost;
             if(c < average) {
-                boost = lerp(boost, average / 1.5, sampSecFactor / 20.0);
-            }else if(c > average + 1.5 * totalComplexity) {
+                boost = lerp(boost, average / 1.5, sampSecFactor / 32.0);
+            }else if(c > average + 0.75 * totalComplexity) {
                 boost = 0;
             }
             complexityArr[i] = c + boost;

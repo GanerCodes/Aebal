@@ -27,7 +27,7 @@ int patternTestLocIndex, patternTestVelIndex, curX, curY, monitorID, cancerCount
 float gameFrameRateTotal, scrollWait, fps_tracker, gameSelect_songSelect, gameSelectExtraYOffset, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, millisDelta, fadeDuration = 5000, fadeOpacityStart = 400, fadeOpacityEnd = 0, grayScaleTimer = 100, trailingAngle = 0, trailStrokeWeight = 4.5;
 String mapGenerationText, delayedSceneScene, settingsFileLoc, songDataFileLoc, previousScene, gameState = "title";
 RNG GFX_R, GAME_R;
-PVector pos, previousPos, randTrans, prevTrailLoc, screenSize, trailLoc, chroma_r, chroma_g, chroma_b;
+PVector pos, previousPos, randTrans, zeroVector, prevTrailLoc, screenSize, trailLoc, chroma_r, chroma_g, chroma_b;
 SFX[] soundList;
 Minim minim;
 color backColor, globalObjColor;
@@ -43,7 +43,7 @@ HashMap<String, timingDisplayElement> timingDisplay;
 arrow a;
 debugList msgList;
 settingButton[] settings, settings_left, settings_right;
-settingButton DEBUG_INFO, TIMING_INFO, DYNAMIC_BACKGROUND_COLOR, DO_POST_PROCESSING, DO_FANCY_TRAILS, BACKGROUND_BLOBS, BACKGROUND_FADE, SHOW_SONG_NAME, DO_HIT_PROMPTS, NO_DAMAGE, RGB_ENEMIES, DO_CHROMA, DO_SHAKE, SHOW_FPS;
+settingButton DEBUG_INFO, TIMING_INFO, SHOW_SONG_GRAPH, DYNAMIC_BACKGROUND_COLOR, DO_POST_PROCESSING, DO_FANCY_TRAILS, BACKGROUND_BLOBS, BACKGROUND_FADE, SHOW_SONG_NAME, DO_HIT_PROMPTS, NO_DAMAGE, RGB_ENEMIES, DO_CHROMA, DO_SHAKE, SHOW_FPS;
 button settings_button, back_button;
 buttonMenu monitorOptions;
 vol_slider volSlider;
@@ -162,6 +162,7 @@ void unpause(boolean setFPS) {
 }
 
 void loadSong() {
+    int loadSongStartTime = millis();
     mapGenerationText = "Loading";
     logmsg("Song complexity: " + str(songComplexity));
     try {
@@ -173,10 +174,13 @@ void loadSong() {
         fadeOpacityStart = 255;
         fadeDuration = 500;
     }
-    logmsg(String.format("Song arr length: %s; SPS: %s", gameMap.complexityArr.length, gameMap.complexityArr.length / (gameMap.song.length() / 1000.0)));
+    resetLevelBuffers();
     gameMap.song.setVol(volSlider.val);
+    logmsg(String.format("Song arr length: %s; SPS: %s", gameMap.complexityArr.length, gameMap.complexityArr.length / (gameMap.song.length() / 1000.0)));
+    logf("Level Load and Generation took %ss.", (millis() - loadSongStartTime) / 1000.0);
+    
     gameMap.song.play();
-    setScene("game");
+    setScene("performSongRenderings");
 }
 
 SFX makeSFX(String name, float defaultVol) {
@@ -224,15 +228,22 @@ void gotHit(int scoreDeduction, int timerDelay, int individualPointReduction, fl
     }
 }
 
+void resetLevelBuffers() {
+    pos = vec2(curX, curY);
+    previousPos = pos.copy();
+    prevTrailLoc = pos.copy();
+    back.beginDraw();
+    back.clear();
+    back.endDraw();
+}
+
 void resetLevel() {
     score = 0;
     hitCount = 0;
     levelSummary_timer = 0;
     textSFX.stop();
     a = new arrow(gameWidth / 2, gameHeight / 2, 0, 500, 1700);
-    back.beginDraw();
-    back.clear();
-    back.endDraw();
+    resetLevelBuffers();
 }
 
 String fileName(String path) {
@@ -505,6 +516,7 @@ void settings() {
     PJOGL.setIcon(sketchPath("assets/images/aebal.png"));
 }
 
+PGraphics intensityGraph;
 void setup() {
     frameRate(FPS);
     surface.setTitle("Aebal");
@@ -552,6 +564,7 @@ void setup() {
         DYNAMIC_BACKGROUND_COLOR = new settingButton(0, 0, 75, 75, 5, "Dynamic Background"  , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
         DO_POST_PROCESSING       = new settingButton(0, 0, 75, 75, 5, "Color Shaders"       , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
         BACKGROUND_BLOBS         = new settingButton(0, 0, 75, 75, 5, "Background Blobs"    , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
+        SHOW_SONG_GRAPH          = new settingButton(0, 0, 75, 75, 5, "Show Intensity Graph", setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
         DO_FANCY_TRAILS          = new settingButton(0, 0, 75, 75, 5, "Fancy Trails"        , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
         BACKGROUND_FADE          = new settingButton(0, 0, 75, 75, 5, "Background Fade"     , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
         SHOW_SONG_NAME           = new settingButton(0, 0, 75, 75, 5, "Show Song Name"      , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
@@ -589,6 +602,8 @@ void setup() {
         settings_right[i].x = gameWidth - 100;
         settings_right[i].y = gameHeight / 1.65 - settings_right.length * 50 + i * 100;
     }
+
+    SHOW_SONG_GRAPH.state = true;
 
     settingsFileLoc = sketchPath("settings.json");
     songDataFileLoc = sketchPath("songData.json");
@@ -643,6 +658,8 @@ void setup() {
     reduceOpacity = loadShader(sketchPath("assets/shaders/reduceOpacity.glsl"));
     bloom = loadShader(sketchPath("assets/shaders/bloom.glsl"));
     loading_animation_buffer = createGraphics(750, 750, P2D);
+    
+    zeroVector = vec2();
     chroma_r = vec2();
     chroma_g = vec2();
     chroma_b = vec2();
@@ -654,6 +671,8 @@ void setup() {
 
     updateMonitorOptions();
     strokeCap(PROJECT);
+    
+    intensityGraph = createGraphics(gameWidth, gameHeight, P2D);
 }
 
 void draw() {
@@ -834,6 +853,11 @@ void draw() {
             back_button.draw();
         } break;
 
+        case "performSongRenderings": {
+            if(SHOW_SONG_GRAPH.state) gameMap.drawIntensityGraph(intensityGraph);
+            setScene("game");
+        } break;
+        
         case "game": {
             noScoreTimer -= (60 / frameRate);
             TT("Physics");
@@ -998,9 +1022,8 @@ void draw() {
             }
             if(DO_CHROMA.state) {
                 TT("ChromaAbbr");
-                float prec = 0.75;
+                float prec = 0.5;
                 PVector nextChroma_r, nextChroma_g, nextChroma_b;
-                PVector zeroVector = vec2();
                 if(intense) {
                     if(c >= 0.5 + songComplexity) {
                         float offset = (2 * ((2 * c + 0.5) % 1) - 1) / 5;
@@ -1024,9 +1047,9 @@ void draw() {
                     nextChroma_g = zeroVector;
                     nextChroma_b = zeroVector;
                 }
-                chroma_r = chroma_r.mult(prec).add(nextChroma_r.mult(1 - prec));
-                chroma_g = chroma_g.mult(prec).add(nextChroma_g.mult(1 - prec));
-                chroma_b = chroma_b.mult(prec).add(nextChroma_b.mult(1 - prec));
+                chroma_r = chroma_r.mult(1 - prec).add(nextChroma_r.mult(prec));
+                chroma_g = chroma_g.mult(1 - prec).add(nextChroma_g.mult(prec));
+                chroma_b = chroma_b.mult(1 - prec).add(nextChroma_b.mult(prec));
                 chroma.set("r", chroma_r.x, chroma_r.y);
                 chroma.set("g", chroma_g.x, chroma_g.y);
                 chroma.set("b", chroma_b.x, chroma_b.y);
@@ -1075,7 +1098,7 @@ void draw() {
             fill(64);
             rect(gameWidth * durationComplete, gameHeight - 4, gameWidth, gameHeight);
 
-
+            if(SHOW_SONG_GRAPH.state) image(intensityGraph, 0, 0);
 
             if(clearEnemies != -1) { //Used to avoid concurrentmodificationexception when clearing enemies when their drawn
                 resetEnemies(clearEnemies, time, true);
@@ -1396,6 +1419,7 @@ void keyPressed(KeyEvent e) {
                     } break;
                     case LEFT: {
                         gameMap.song.skip(-15 * 1000);
+                        gameMap.resetEnemiesWithIndex();
                         logmsg("Rewinded 15 seconds");
                     } break;
                     case RIGHT: {

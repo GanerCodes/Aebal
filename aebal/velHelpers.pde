@@ -51,21 +51,16 @@ boolean squareIntersection(PVector loc, float s, PVector a, PVector b) { //This 
 }
 boolean rectIntersection(PVector loc, PVector s, PVector a, PVector b) { //Corner aligned as it should be
     return
-    lineIntersection(new PVector(loc.x      , loc.y      ), new PVector(loc.x + s.x, loc.y      ), a, b) || 
-    lineIntersection(new PVector(loc.x + s.x, loc.y      ), new PVector(loc.x + s.x, loc.y + s.y), a, b) || 
-    lineIntersection(new PVector(loc.x + s.x, loc.y + s.y), new PVector(loc.x      , loc.y + s.y), a, b) || 
-    lineIntersection(new PVector(loc.x      , loc.y + s.y), new PVector(loc.x      , loc.y      ), a, b);
+    lineIntersection(vec2(loc.x      , loc.y      ), vec2(loc.x + s.x, loc.y      ), a, b) || 
+    lineIntersection(vec2(loc.x + s.x, loc.y      ), vec2(loc.x + s.x, loc.y + s.y), a, b) || 
+    lineIntersection(vec2(loc.x + s.x, loc.y + s.y), vec2(loc.x      , loc.y + s.y), a, b) || 
+    lineIntersection(vec2(loc.x      , loc.y + s.y), vec2(loc.x      , loc.y      ), a, b);
 }
 boolean quadLineSquareIntersection(PVector a1, PVector a2, PVector b1, PVector b2, float s) { //1000% sure there is some fancy way to do this like I did with a bunch of the simpler stuff but I can't be asked rn
     if((a1.x == a2.x && a1.y == a2.y) || (b1.x == b2.x && b1.y == b2.y)) return false;
     
     s *= 0.5;
-    PVector[] corners = new PVector[] {
-        new PVector( s,  s),
-        new PVector( s, -s),
-        new PVector(-s,  s),
-        new PVector(-s, -s)
-    };
+    PVector[] corners = new PVector[] { vec2( s,  s), vec2( s, -s), vec2(-s,  s), vec2(-s, -s) };
     for(PVector c1 : corners) {
         for(PVector c2 : corners) {
             if(lineIntersection(
