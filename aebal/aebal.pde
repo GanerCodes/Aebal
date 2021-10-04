@@ -165,15 +165,15 @@ void loadSong() {
     int loadSongStartTime = millis();
     mapGenerationText = "Loading";
     logmsg("Song complexity: " + str(songComplexity));
-    try {
-        gameMap = new GameMap(songP.fileName, sketchPath("patterns.json"), screenSize, GAME_R, songComplexity);
-    }catch(Throwable t) {
-        logf("Error in song load! \"%s\"", t);
-        mapGenerationText = "";
-        setSceneDelay("gameSelect", 3500);
-        fadeOpacityStart = 255;
-        fadeDuration = 500;
-    }
+    // try {
+        gameMap = new GameMap(songP.fileName, sketchPath("patterns.json"), screenSize, GAME_R);
+    // }catch(Throwable t) {
+    //     logf("Error in song load! \"%s\"", t);
+    //     mapGenerationText = "";
+    //     setSceneDelay("gameSelect", 3500);
+    //     fadeOpacityStart = 255;
+    //     fadeDuration = 500;
+    // }
     resetLevelBuffers();
     gameMap.song.setVol(volSlider.val);
     logmsg(String.format("Song arr length: %s; SPS: %s", gameMap.complexityArr.length, gameMap.complexityArr.length / (gameMap.song.length() / 1000.0)));
@@ -272,7 +272,8 @@ void selectLevel(songElement song) {
                 bubbles.add(new bubble(vec2(GFX_R.rand(0, gameWidth), GFX_R.rand(0, gameHeight))));
             }
             logmsg("Random seed for \"" + song.title + "\": " + GAME_R.setSeed(song.title.hashCode()));
-            thread("loadSong");
+            loadSong();
+            // thread("loadSong");
         } break;
     }
 }
@@ -1440,7 +1441,10 @@ void keyPressed(KeyEvent e) {
                                 logmsg("Reset enemy spawns and reloaded pattern file.");
                             } break;
                             default: {
-                                String[] currentIndices = gameMap.spawner.getLocVelFromIndices(patternTestLocIndex, patternTestVelIndex);
+                                String[] currentIndices = new String[] {
+                                    gameMap.spawner.locations.get (patternTestLocIndex).ID,
+                                    gameMap.spawner.velocities.get(patternTestVelIndex).ID
+                                };
                                 if(keyCode >= 49 && keyCode <= 57) {
                                     gameMap.generateTestPattern(currentIndices[0], currentIndices[1], gameMap.song.getTime() + keyCode - 48);
                                     logf("Spawned pattern \"%s\"|\"%s\"", currentIndices[0], currentIndices[1]);
@@ -1456,7 +1460,10 @@ void keyPressed(KeyEvent e) {
                                     }else{
                                         break;
                                     }
-                                    String[] newIndices = gameMap.spawner.getLocVelFromIndices(patternTestLocIndex, patternTestVelIndex);
+                                    String[] newIndices = new String[] {
+                                        gameMap.spawner.locations.get (patternTestLocIndex).ID,
+                                        gameMap.spawner.velocities.get(patternTestVelIndex).ID
+                                    };
                                     logf("Changed Pattern \"%s\"|\"%s\" --> \"%s\"|\"%s\"", currentIndices[0], currentIndices[1], newIndices[0], newIndices[1]);
                                     if(key == 'h') {
                                         gameMap.generateTestPattern(newIndices[0], newIndices[1], gameMap.song.getTime() + 3);

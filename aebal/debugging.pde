@@ -52,20 +52,12 @@ void logmsg(String msg) {
         }
     }
 }
-
 void logmsg(Object... params) {
     String s = "";
     for(int i = 0; i < params.length; i++) {
         s += params[i].toString() + (i < params.length - 1 ? " " : "");
     }
     logmsg(s);
-}
-
-String format(String s, Object... params) {
-    return String.format(s, params);
-}
-void printf(String s, Object... params) {
-    println(format(s, params));
 }
 void logf(String s, Object... params) {
     logmsg(format(s, params));

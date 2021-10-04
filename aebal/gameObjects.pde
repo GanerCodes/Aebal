@@ -2,6 +2,7 @@ class Enemy {
     PVector loc, vel;
     PVector locCalc;
     float spawnTime, despawnTime, velOffset;
+    String spawnInfo;
     GameMap gameMap;
     Enemy(GameMap gameMap, PVector loc, PVector vel, float spawnTime, float despawnTime) {
         this(loc, vel);

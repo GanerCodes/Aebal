@@ -120,21 +120,18 @@ class Equation {
 
     int type;
     String ID, equationPrintable;
-    String[] relatedEquationNames, categories;
 
     EnemyPatternProperties spawnProperties;
-    Equation(int type, String ID, String[] relatedEquationNames, String[] categories, String equationPrintable, EnemyPatternProperties spawnProperties) {
+    Equation(int type, String ID, String equationPrintable, EnemyPatternProperties spawnProperties) {
         this.type = type;
         this.ID = ID;
-        this.relatedEquationNames = relatedEquationNames;
-        this.categories = categories;
         this.equationPrintable = equationPrintable;
         this.spawnProperties = spawnProperties;
     }
     String toString() {
         return String.format(
-            "%s:\n\tEquation: %s\n\tCategories: %s\n\tConnections: %s\n\tProperties:\n%s",
-            ID, equationPrintable, Arrays.toString(categories), Arrays.toString(relatedEquationNames), spawnProperties.toString().replaceAll("(?m)^", "\t\t")
+            "%s:\n\tEquation: %s\n\tProperties:\n%s",
+            ID, equationPrintable, spawnProperties.toString().replaceAll("(?m)^", "\t\t")
         );
     }
     String toShortString() {
@@ -144,8 +141,8 @@ class Equation {
 class Equation1D extends Equation { //1 output dimension; implicit equation
     String equationStr;
     Expression equation;
-    Equation1D(String ID, String[] relatedEquationNames, String[] categories, EnemyPatternProperties spawnProperties, String eq) {
-        super(IMPLICIT, ID, relatedEquationNames, categories, eq, spawnProperties);
+    Equation1D(String ID, EnemyPatternProperties spawnProperties, String eq) {
+        super(IMPLICIT, ID, eq, spawnProperties);
         equation = new ExpressionBuilder(eq).functions(customEquationFunctions).variables("x", "y").build();
     }
     float getVal(float x, float y, float t) {
@@ -156,8 +153,8 @@ class Equation2D extends Equation { //2 output dimensions; parametric equation
     String equationXStr, equationYStr;
     Expression equationX, equationY;
     float[] distanceIntegral;
-    Equation2D(String ID, String[] relatedEquationNames, String[] categories, EnemyPatternProperties spawnProperties, String eqX, String eqY) {
-        super(PARAMETRIC, ID, relatedEquationNames, categories, String.format("[%s, %s]", eqX, eqY), spawnProperties);
+    Equation2D(String ID, EnemyPatternProperties spawnProperties, String eqX, String eqY) {
+        super(PARAMETRIC, ID, String.format("[%s, %s]", eqX, eqY), spawnProperties);
         equationX = new ExpressionBuilder(eqX).functions(customEquationFunctions).variables("x", "y", "t").build();
         equationY = new ExpressionBuilder(eqY).functions(customEquationFunctions).variables("x", "y", "t").build();
     }
@@ -168,33 +165,85 @@ class Equation2D extends Equation { //2 output dimensions; parametric equation
         );
     }
 }
-class EquationDifficultySorter implements Comparator<Equation> {
-    @Override
-    int compare(Equation a, Equation b) {
-        return Float.compare(a.spawnProperties.difficulty, b.spawnProperties.difficulty);
-    }
-}
 
-String getPatternModeString(int mode) {
-    return mode == PatternSpawner.INTERCEPT_DEFAULT ? "INTERCEPT_DEFAULT" : (mode == PatternSpawner.INTERCEPT_ENTER ? "INTERCEPT_DEFAULT" : "INTERCEPT_EXIT");
+
+float getWeighedRandom(RNG rng, float difficulty, float intensity) {
+    return 1 - pow(rng.rand(), max(0.85, difficulty * intensity));
+}
+class SpawnPattern {
+    String ID;
+    String[] choices;
+    float[]  probs;
+    SpawnPattern(String ID, String[] choices, float[] probs) {
+        this.ID = ID;
+        this.choices = choices;
+        this.probs = normalizeProportions(probs);
+        
+        int[] sortOrder = reverse(getSortIndices(this.probs));
+        this.probs = sortByIndicies(this.probs, sortOrder);
+        this.choices = sortByIndicies(this.choices, sortOrder);
+    }
+    String generate(RNG rng, float difficulty, float intensity) {
+        return choices[getProportionIndex(probs, getWeighedRandom(rng, difficulty, intensity))];
+    }
+    String toString() {
+        String r = "";
+        for(int i = 0; i < choices.length; i++) {
+            r += format("%s (%s%%)", choices[i], new DecimalFormat("###.###").format(100 * probs[i]));
+            if(i != choices.length - 1) r += ", ";
+        }
+        return r;
+    }
 }
 class PatternSpawner {
     final static int INTERCEPT_DEFAULT = 0;
     final static int INTERCEPT_ENTER   = 1;
     final static int INTERCEPT_EXIT    = 2;
 
-    boolean disableNegativeSpawnTimeExclusion = false;
+    boolean disableNegativeSpawnTimeExclusion;
 
     ArrayList<Equation> locations;
     ArrayList<Equation2D> velocities;
-    HashMap<String, Equation>   locIDMapping;
-    HashMap<String, Equation2D> velIDMapping;
-    HashMap<String, ArrayList<Equation2D>> locIDVelMapping;
-    HashMap<String, ArrayList<Equation  >> spawnCategories;
+    HashMap<String, Equation>   locIDMap;
+    HashMap<String, Equation2D> velIDMap;
+    HashMap<String, SpawnPattern> categories;
+    HashMap<String, SpawnPattern> locVelMap;
+    
+    void decompositJSONCategory(JSONObject json, HashMap<String, SpawnPattern> categories) { //took me way too long to make
+        for(Object key_temp : json.keys()) {
+            String category_name = (String)key_temp;
+            for(String key : splitTrim(category_name, ",")) {
+                StringList names = new StringList();
+                FloatList probs = new FloatList();
+                if(isJSONObject(json, category_name)) {
+                    JSONObject innerJSON = json.getJSONObject(category_name);
+                    for(Object key_inner_temp : innerJSON.keys()) {
+                        String inner_name = (String)key_inner_temp;
+                        float prob = innerJSON.getFloat(inner_name);
+                        for(String name : splitTrim(inner_name, ",")) {
+                            names.append(name);
+                            probs.append(prob);
+                        }
+                    }
+                }else{
+                    String keyVal = json.getString(category_name);
+                    for(String name : splitTrim(keyVal, ",")) {
+                        names.append(name);
+                        probs.append(1);
+                    }
+                }
+                categories.put(key, new SpawnPattern(key, names.array(), probs.array()));
+            }
+        }
+    }
 
     PatternSpawner(String filename) {
-        ArrayList<Equation>   locations  = new ArrayList();
-        ArrayList<Equation2D> velocities = new ArrayList();
+        locations  = new ArrayList();
+        velocities = new ArrayList();
+        locIDMap   = new HashMap();
+        velIDMap   = new HashMap();
+        categories = new HashMap();
+        locVelMap  = new HashMap();
 
         String jsonString = "";
         for(String s : loadStrings(filename)) {
@@ -205,71 +254,56 @@ class PatternSpawner {
         }
 
         JSONObject json = parseJSONObject(jsonString);
-        JSONObject locationPatterns = json.getJSONObject("location");
-        JSONObject velocityPatterns = json.getJSONObject("velocity");
+        JSONObject jsonLocs = json.getJSONObject("location");
+        JSONObject jsonVels = json.getJSONObject("velocity");
+        JSONObject jsonCategories = json.getJSONObject("categories");
+        JSONObject jsonLocVelMap  = json.getJSONObject("locVelMap" );
 
-        for(Object key : locationPatterns.keys()) {
+        for(Object key_temp : jsonLocs.keys()) {
             try {
-                String k = (String)key;
-                locations .add(parsePattern(locationPatterns.getJSONObject(k), k, false));
-            } catch(Throwable t) { logmsg("Failed to parse pattern: " + t.toString()); }
+                String key = (String)key_temp;
+                JSONObject jVal = jsonLocs.getJSONObject(key);
+                Equation loc = parsePattern(jVal, key, false); 
+                locations.add(loc);
+                locIDMap.put(loc.ID, loc);
+            } catch(Throwable t) { logmsg("Failed to parse location pattern: " + t.toString()); }
         }
-        for(Object key : velocityPatterns.keys()) {
+        for(Object key_temp : jsonVels.keys()) {
             try {
-                String k = (String)key;
-                velocities.add((Equation2D)parsePattern(velocityPatterns.getJSONObject(k), k, true));
-            } catch(Throwable t) { logmsg("Failed to parse pattern: " + t.toString()); }
+                String key = (String)key_temp;
+                JSONObject jVal = jsonVels.getJSONObject(key);
+                Equation2D vel = (Equation2D)parsePattern(jVal, key, true);
+                velocities.add(vel);
+                velIDMap.put(vel.ID, vel);
+            } catch(Throwable t) { logmsg("Failed to parse velocity pattern: " + t.toString()); }
         }
-
-        init(locations, velocities);
+        
+        decompositJSONCategory(jsonCategories, categories);
+        decompositJSONCategory(jsonLocVelMap , locVelMap);
+        
+        for(Map.Entry<String, SpawnPattern> entry : categories.entrySet()) {
+            logf("Category %s: %s", entry.getKey(), entry.getValue());
+        }
+        for(Map.Entry<String, SpawnPattern> entry : locVelMap.entrySet()) {
+            logf("Location %s: %s", entry.getKey(), entry.getValue());
+        }
+        
     }
 
-    String[] getLocVelFromIndices(int locIndex, int velIndex) {
-        String locID = locations.get(locIndex % locations.size()).ID;
-        return new String[] { locID, locIDVelMapping.get(locID).get(velIndex % locIDVelMapping.get(locID).size()).ID };
+    ArrayList<Enemy> makePattern(GameMap gameMap, String loc, String vel, RNG rng, float time, float intensity, float difficulty) {
+        return generatePattern(locIDMap.get(loc), velIDMap.get(vel), gameMap, rng, time, getWeighedRandom(rng, intensity, difficulty));
     }
-
-    //intensity  [0   - 1]
-    //difficulty [0.1 - 1] ranges from 0.1 to 1.0; 0.1 = nearly zero chance of hard pattern; 1.0 = every pattern is the same 
-    
-    ArrayList<Enemy> makePattern(GameMap gameMap, Equation spawnLocEq, Equation spawnVelEq, RNG rng, float time, float intensity, float difficulty) {
-        return generatePattern(spawnLocEq, (Equation2D)spawnVelEq, gameMap, rng, time, getWeighedRandom(rng, intensity, difficulty));
-    }
-    ArrayList<Enemy> makePatternFromLocation(GameMap gameMap, Equation spawnLocEq, RNG rng, float time, float intensity, float difficulty) {
-        ArrayList<Equation2D> velEquationChoices = locIDVelMapping.get(spawnLocEq.ID);
-        int j = int(velEquationChoices.size() * getWeighedRandom(rng, intensity, difficulty));
-        Equation2D spawnVelEq = velEquationChoices.get(j);
-        return makePattern(gameMap, spawnLocEq, spawnVelEq, rng, time, intensity, difficulty);
-    }
-    ArrayList<Enemy> makePatternFromLocation(GameMap gameMap, String locEqName, RNG rng, float time, float intensity, float difficulty) {
-        Equation spawnLocEq = locIDMapping.get(locEqName);
-        return makePatternFromLocation(gameMap, spawnLocEq, rng, time, intensity, difficulty);
+    ArrayList<Enemy> makePatternFromLocation(GameMap gameMap, String loc, RNG rng, float time, float intensity, float difficulty) {
+        return makePattern(gameMap, loc, locVelMap.get(loc).generate(rng, difficulty, intensity), rng, time, intensity, difficulty);
     }
     ArrayList<Enemy> makePatternFromCategory(GameMap gameMap, String categoryName, RNG rng, float time, float intensity, float difficulty) {
-        ArrayList<Equation> locEquationChoices = spawnCategories.get(categoryName);
-        Equation spawnLocEq = locEquationChoices.get(int(locEquationChoices.size() * getWeighedRandom(rng, intensity, difficulty)));
-        return makePatternFromLocation(gameMap, spawnLocEq, rng, time, intensity, difficulty);
-    }
-    ArrayList<Enemy> makePattern(GameMap gameMap, String locEqName, String velEqName, RNG rng, float time, float intensity, float difficulty) {
-        return makePattern(gameMap, locIDMapping.get(locEqName), (Equation2D)velIDMapping.get(velEqName), rng, time, intensity, difficulty);
-    }
-    float getWeighedRandom(RNG rng, float intensity, float difficulty) {
-        return constrain(1 - pow(rng.rand(), intensity * difficulty), 0, 0.9999);
+        return makePatternFromLocation(gameMap, categories.get(categoryName).generate(rng, difficulty, intensity), rng, time, intensity, difficulty);
     }
 
     Equation parsePattern(JSONObject pattern, String ID, boolean isVelocityPattern) throws Exception {        
         int equationType;
 
         float difficulty = jsonVal(pattern, "difficulty", 0);
-        String[] relatedEquationNames = null, categories = null;
-        if(!isVelocityPattern) {
-            relatedEquationNames = pattern.getJSONArray("velChoices").getStringArray();
-            if(pattern.isNull("categories")) {
-                categories = new String[] {"default"};
-            }else{
-                categories = pattern.getJSONArray("categories").getStringArray();
-            }
-        }
         
         String equationImp = null, equationX = null, equationY = null;
         if(pattern.isNull("equation")) {
@@ -291,10 +325,10 @@ class PatternSpawner {
         EnemyPatternProperties properties = new EnemyPatternProperties(difficulty, transformations);
         Equation equation;
         if(equationType == Equation.PARAMETRIC) {
-            equation = new Equation2D(ID, relatedEquationNames, categories, properties, equationX, equationY);
+            equation = new Equation2D(ID, properties, equationX, equationY);
             properties.angleSweep = defaultParse2D(pattern, "angleSweep", vec2(-PI, PI));
         }else{
-            equation = new Equation1D(ID, relatedEquationNames, categories, properties, equationImp);
+            equation = new Equation1D(ID, properties, equationImp);
         }
 
         properties.countBounds = defaultParse(pattern, "countBounds", isVelocityPattern ? vec3(1) : (equationType == Equation.PARAMETRIC ? vec3(25) : vec3(5)));
@@ -344,8 +378,6 @@ class PatternSpawner {
             }
         }
 
-        logmsg(equation.toShortString());
-        println(equation);
         return equation;
     }
     
@@ -375,36 +407,6 @@ class PatternSpawner {
         if(vals.length == 1) return new PVector(vals[0], vals[0]);
         if(vals.length == 2) return new PVector(vals[0], vals[1]);
         throw new Exception("Pattern Parsing Error: Couldn't parse bounds");
-    }
-
-    void init(ArrayList<Equation> locations, ArrayList<Equation2D> velocities) {
-        this.locations = locations;
-        this.velocities = velocities;
-
-        locations.sort(new EquationDifficultySorter());
-        velIDMapping    = new HashMap<String, Equation2D>();
-        locIDMapping    = new HashMap<String, Equation  >();
-        locIDVelMapping = new HashMap<String, ArrayList<Equation2D>>();
-        spawnCategories = new HashMap<String, ArrayList<Equation  >>(); 
-
-        for(Equation2D velEquation : velocities) velIDMapping.put(velEquation.ID, velEquation);
-
-        for(Equation locEquation : locations) {
-            for(String s : locEquation.categories) {
-                if(!spawnCategories.containsKey(s)) {
-                    spawnCategories.put(s, new ArrayList<Equation>());
-                }
-                spawnCategories.get(s).add(locEquation);
-            }
-            locIDMapping.put(locEquation.ID, locEquation);
-            ArrayList<Equation2D> complementVelocities = new ArrayList();
-            for(String velName : locEquation.relatedEquationNames) complementVelocities.add(velIDMapping.get(velName));
-            complementVelocities.sort(new EquationDifficultySorter());
-            locIDVelMapping.put(locEquation.ID, complementVelocities);
-        }
-        for(HashMap.Entry<String, ArrayList<Equation>> set : spawnCategories.entrySet()) {
-            set.getValue().sort(new EquationDifficultySorter());
-        }
     }
 
     ArrayList<Enemy> generatePattern(Equation locEq, Equation2D velEq, GameMap gameMap, RNG rng, float time, float iLerp) {
@@ -536,12 +538,14 @@ class PatternSpawner {
         }
         
         if(enemies.size() > 0) {
+            String spawnInfo = format("%s | %s", locEq.ID, velEq.ID);
             for(int i = enemies.size() - 1; i >= 0; i--) {
                 Enemy e = enemies.get(i);
                 e.loc.add(locOffset);
                 
                 e = gameMap.createEnemy(e, time);
                 enemies.set(i, e);
+                e.spawnInfo = spawnInfo;
                 
                 if(e.spawnTime < 0 && !disableNegativeSpawnTimeExclusion) {
                     // logmsg(String.format("Enemy was excluded for being on screen at song start: [t=%ss] (%s)", time, e));

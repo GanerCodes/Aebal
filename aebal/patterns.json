@@ -39,11 +39,51 @@
 //   |     }
 //   | }
 
+
+//categories and locVelMap work a bit weirdly, basically the percents or decimals or whatever are normalized. Comma separating is no different from having each element set to the same value
+//difficulty basically makes less likely choices more likely, and thus more likely choices less likely.
+
+//category: "a": "b, c" = {"b, a": 1}
+//locVelMap: "a": "b, a" = {}
 {
+    "categories": {
+        "common": "common",
+        "heavyBeat": {
+            "triangle, square, circle": 45,
+            "solidTriangle, solidSquare, solidCircle": 35,
+            "heart, hourglass, field": 20
+        },
+        "default": {
+            "triangle, square, circle": 45,
+            "solidCircle, heart, hourglass": 30,
+            "field": 25
+        }
+    },
+    "locVelMap": {
+        "common": "linearRandomDirection",
+        "solidTriangle, solidCircle, field, linearUp": "linearUp",
+        "heart, triangle, circle": {
+            "linearShrink": 0.55,
+            "90deg": 0.3,
+            "crissCross": 0.15
+        },
+        "solidSquare": {
+            "linearUp": 0.7,
+            "crissCross": 0.3
+        },
+        "square": {
+            "linearShrink": 0.4,
+            "90deg": 0.3,
+            "crissCross, shrinker": 0.15
+        },
+        "hourglass": {
+            "linearShrink": 0.55,
+            "crissCross": 0.3,
+            "shrinker": 0.2
+        }
+    },
     "location": {
         "common": {
-            "velChoices": ["linearRandomDirection"],
-            "categories": ["common"],
             "spawnMode": 3,
             "equationX": "0",
             "equationY": "0",
@@ -52,8 +92,6 @@
             "modifiers": ["disableRandomRotation"]
         },
         "solidTriangle": {
-            "velChoices": ["linearUp"],
-            "categories": ["heavyBeat"],
             "spawnMode": 1,
             "equation": "abs(y + abs(x)) + abs(x) - 1",
             "range": 1.05,
@@ -63,8 +101,6 @@
             "distBounds": "0.25, 0.5"
         },
         "solidSquare": {
-            "velChoices": ["linearUp", "crissCross"],
-            "categories": ["heavyBeat"],
             "spawnMode": 1,
             "equation": "-1",
             "range": 1,
@@ -74,8 +110,6 @@
             "distBounds": "0.35, 0.55"
         },
         "solidCircle": {
-            "velChoices": ["linearUp"],
-            "categories": ["default", "heavyBeat"],
             "spawnMode": 1,
             "equation": "pow(abs(x), 1.7) + pow(abs(y), 1.7) - 1",
             "range": 1.075,
@@ -85,13 +119,11 @@
             "distBounds": "0.25, 0.5"
         },
         "heart": {
-            "velChoices": ["90deg", "linearShrink", "crissCross"],
-            "categories": ["default", "heavyBeat"],
             "equationX": "16*pow(sin(t),3)",
             "equationY": "13*cos(t)-5*cos(2*t)-2*cos(3*t)-cos(4*t)",
             "angleSweep": "pi, 9.42477796077",
             "transform": [
-                {"scale": "0.23"}
+                {"scale": "0.2"}
             ],
             "countBounds": "16, 23",
             "scaleBounds": "0.5, 0.8",
@@ -100,18 +132,13 @@
             "modifiers": ["evenSpacing"]
         },
         "triangle": {
-            "velChoices": ["90deg", "linearShrink", "crissCross"],
-            "categories": ["default", "heavyBeat"],
             "equationX": "cos(t)/(abs(sin(t)+abs(cos(t)))+abs(cos(t)))",
             "equationY": "sin(t)/(abs(sin(t)+abs(cos(t)))+abs(cos(t)))",
-            "distBounds": "0, 0.25",
             "scaleBounds": "0.5, 0.8",
             "speedBounds": "0.4, 0.6",
             "modifiers": ["evenSpacing"]
         },
         "square": {
-            "velChoices": ["90deg", "linearShrink", "crissCross", "shrinker"],
-            "categories": ["default", "heavyBeat"],
             "equationX": "cos(t)/max(abs(cos(t)), abs(sin(t)))",
             "equationY": "sin(t)/max(abs(cos(t)), abs(sin(t)))",
             "scaleBounds": "0.5, 0.8",
@@ -120,16 +147,12 @@
             "modifiers": ["evenSpacing"]
         },
         "circle": {
-            "velChoices": ["90deg", "linearShrink", "crissCross"],
-            "categories": ["default", "heavyBeat"],
             "equationX": "cos(t)",
             "equationY": "sin(t)",
             "distBounds": "0, 0.25",
             "speedBounds": "0.4, 0.6",
         },
         "hourglass": {
-            "velChoices": ["90deg", "linearShrink", "crissCross", "shrinker"],
-            "categories": ["default", "heavyBeat"],
             "equationX": "(cos(t)*sin(t))/max(abs(cos(t)), abs(sin(t)))",
             "equationY": "(sin(t))/max(abs(cos(t)), abs(sin(t)))",
             "speedBounds": "0.4, 0.6",
@@ -137,8 +160,6 @@
             "countBounds": "18, 23"
         },
         "field": {
-            "velChoices": ["linearUp"],
-            "categories": ["default", "heavyBeat"],
             "equationX": "t",
             "equationY": "0",
             "countBounds": "10, 20",
@@ -187,6 +208,5 @@
             "scaleBounds": "2, 0.7",
             "modifiers": ["disableRandomRotation"]
         }
-
     }
 }

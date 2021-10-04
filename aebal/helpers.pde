@@ -137,7 +137,6 @@ class RNG {
     boolean rngProportion()    { return rP();  }
     boolean randProportion()   { return rP();  }
     boolean randomProportion() { return rP();  }
-
 }
 
 // This is dumb and forces evaluation of all arguments
@@ -229,16 +228,37 @@ float lerpCentered(float val, PVector range) {
     return lerpCentered(range, val);
 }
 
+String format(String s, Object... params) {
+    return String.format(s, params);
+}
+void printf(String s, Object... params) {
+    println(format(s, params));
+}
+String[] splitTrim(String s, String d) {
+    String[] spl = split(s, d);
+    for(int i = 0; i < spl.length; i++) spl[i] = trim(spl[i]);
+    return spl;
+}
+
 float multiplyLenient(float a, float b) {
     return a > 0 && b > 0 ? a * b - abs((a - b) / (a + b)) : a * b;
 }
 float roundArbitrary(float v, float r) {
     return r * round(v / r);
 }
+
 float rootMeanSquare(float[] vals) {
     float r = 0;
     for(int i = 0; i < vals.length; i++) r += sq(vals[i]);
     return sqrt(r / vals.length);
+}
+float sum(float[] vals) {
+    float r = 0;
+    for(float v : vals) r += v;
+    return r;
+}
+float average(float[] vals) {
+    return sum(vals) / vals.length;
 }
 float[] accumulate(float[] vals) {
     if(vals.length <= 1) return vals;
@@ -246,6 +266,19 @@ float[] accumulate(float[] vals) {
         vals[i] += vals[i - 1];
     }
     return vals;
+}
+float[] normalizeProportions(float[] vals) {
+    float total = sum(vals);
+    for(int i = 0; i < vals.length; i++) vals[i] /= total;
+    return vals;
+}
+int getProportionIndex(float[] vals, float prop) {
+    float s = 0;
+    for(int i = 0; i < vals.length; i++) {
+        s += vals[i];
+        if(s >= prop) return i;
+    }
+    return vals.length - 1;
 }
 
 
@@ -304,4 +337,7 @@ String  jsonVal(JSONObject json, String key, String  alternate) {
 }
 boolean jsonVal(JSONObject json, String key, boolean alternate) {
     return json.isNull(key) ? alternate : json.getBoolean(key);
+}
+boolean isJSONObject(JSONObject json, String key) {
+    return json.get(key) instanceof JSONObject;
 }

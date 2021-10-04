@@ -7,7 +7,7 @@ void setLoadingText(String s) {
 
 class GameMap {
     int SPS, formCount, spawnIndex;
-    float finalIntegralValue, songDuration, defaultSpeed, dt, marginSize, difficulty;
+    float finalIntegralValue, songDuration, defaultSpeed, dt, marginSize;
     String songName, patternFileName;
     PVector gameDisplaySize, gameSize, gameCenter;
     float[] velArr, integralArr, complexityArr;
@@ -56,17 +56,16 @@ class GameMap {
                 if(indx == samples.length) break;
                 buffer[o] = samples[i * SAMPLES_PER_SECOND + o];
             }
-            complexityArr[i] = difficulty * findComplexity(buffer) * (1 + rootMeanSquare(buffer)) / 2;
+            complexityArr[i] = difficultySlider.val * findComplexity(buffer) * (1 + rootMeanSquare(buffer)) / 2;
         }
     }
     void loadPatternFile() {
         setLoadingText("Loading patterns");
         spawner = new PatternSpawner(patternFileName);
     }
-    GameMap(String songName, String patternFileName, PVector gameSize, RNG rng, float difficulty) {
+    GameMap(String songName, String patternFileName, PVector gameSize, RNG rng) {
         init(gameSize);
         this.songName = songName;
-        this.difficulty = difficulty;
         this.patternFileName = patternFileName;
         this.rng = rng;
 
@@ -91,23 +90,23 @@ class GameMap {
     float[] generateVels() {
         float[] velArr = new float[SAMPLES_PER_SECOND * int(songDuration)];
         for(int i = 0; i < velArr.length; i++) {
-            velArr[i] = defaultSpeed * (1 + difficulty) + 3 * difficulty * SPS * complexityArr[int(map(i, 0, velArr.length, 0, complexityArr.length))];
+            velArr[i] = defaultSpeed * (1 + difficultySlider.val) + 3 * difficultySlider.val * SPS * complexityArr[int(map(i, 0, velArr.length, 0, complexityArr.length))];
         }
         return velArr;
     }
     void createPattern(String category, float time, float intensity) {
-        enemies.addAll(spawner.makePatternFromCategory(this, category , rng, time, intensity, difficulty));
+        enemies.addAll(spawner.makePatternFromCategory(this, category , rng, time, intensity, difficultySlider.val));
     }
     void createPattern(String locEqName, String velEqName, float time, float intensity) {
-        enemies.addAll(spawner.makePattern(this, locEqName , velEqName, rng, time, intensity, difficulty));
-    }
-    void createPatternFromLoc(String locEqName, float time, float intensity) {
-        enemies.addAll(spawner.makePatternFromLocation(this, locEqName, rng, time, intensity, difficulty));
+        enemies.addAll(spawner.makePattern(this, locEqName , velEqName, rng, time, intensity, difficultySlider.val));
     }
     void addRecentEnemies(float time) {
         while(spawnIndex < enemySpawns.length && time >= enemySpawns[spawnIndex].spawnTime) {
             Enemy e = enemySpawns[spawnIndex];
-            if(time < e.despawnTime) enemies.add(e);
+            if(time < e.despawnTime) {
+                enemies.add(e);
+                if(allowDebugActions && e.spawnInfo != null) logmsg("Spawned Enemy: " + e.spawnInfo);
+            }
             spawnIndex++;
         }
     }
@@ -150,16 +149,11 @@ class GameMap {
         resetEnemiesWithIndex();
 
         setLoadingText("Adjusting intensity");
-
-        float average = 0;
-        for(int i = 0; i < complexityArr.length; i++) average += complexityArr[i];
-        average /= complexityArr.length;
-        for(int i = 0; i < complexityArr.length; i++) complexityArr[i] = pow(complexityArr[i] / (2.25 * average), 1.5);
-        average = 0;
-        for(int i = 0; i < complexityArr.length; i++) average += complexityArr[i];
-        average /= complexityArr.length;
+        float adv = average(complexityArr);
+        for(int i = 0; i < complexityArr.length; i++) complexityArr[i] = pow(complexityArr[i] / (2.25 * adv), 1.5);
 
         float totalComplexity = findComplexity(complexityArr);
+        float adjDifficulty = map(difficultySlider.val, difficultySlider.val_min, difficultySlider.val_max, 0.1, 1);
 
         int iSec = int(complexityArr.length / songDuration);       //seconds -> intTime
         float sampSecFactor = songDuration / complexityArr.length; //intTime -> seconds
@@ -167,9 +161,9 @@ class GameMap {
         float boost = 0;
         for(int i = 0; i < complexityArr.length; i++) {
             float c = complexityArr[i] + boost;
-            if(c < average) {
-                boost = lerp(boost, average / 1.5, sampSecFactor / 32.0);
-            }else if(c > average + 0.75 * totalComplexity) {
+            if(c < adv) {
+                boost = lerp(boost, adv / 1.5, sampSecFactor / 32.0);
+            }else if(c > adv + 0.75 * totalComplexity) {
                 boost = 0;
             }
             complexityArr[i] = c + boost;
@@ -177,36 +171,35 @@ class GameMap {
 
         setLoadingText("Generating position integral");
         generateIntegral(generateVels(), gameSize);
-        
         IntList avoidTimings = new IntList();
         
-        setLoadingText("Adding random enemies");
-        { //Randomish enemies
+        { setLoadingText("Adding random enemies");
             float spawnTime = 1;
             for(int i = 0; i < complexityArr.length; i++) {
                 float c = complexityArr[i];
                 float ct = i * sampSecFactor;
-                if(ct >= spawnTime && c > average - totalComplexity / 1.25) {
-                    float r = rng.rand() * c * 1.25;
-                    if(rng.rand() + c > 0.5) createPattern("common", ct, c);
-                    if(r > 0.325 && rng.randProp(0.25 + (difficulty - 0.25))) {
-                        createPattern("default", ct, c);
-                        spawnTime += 1.8 - difficulty - c / 3.25;
+                if(ct >= spawnTime && c > adv - adjDifficulty * totalComplexity) {
+                    if(rng.rand() + c > 0.5) {
+                        createPattern("common", ct, c);
                     }
-                    spawnTime += 1 / (0.4 * (pow(difficulty, 1.35) + 2 * c)) + max(0, 2 * (1 - difficulty));
+                    if(c > adv + totalComplexity && rng.randProp(pow(adjDifficulty, 1.5))) {
+                        createPattern("default", ct, c);
+                        spawnTime += 2.5 / (c * adjDifficulty);
+                    }
+                    spawnTime += c / pow(adjDifficulty, 1.75);
                     avoidTimings.append(i);
                 }
             }
         }
-        setLoadingText("Performing beat detection");
-        { //Beat detection [AIDS WARNING]        
+        
+        { setLoadingText("Performing beat detection");    
             int minSeg = iSec / 3;
             int maxSeg = 5 * iSec;
             int minConsecutiveBeats = 5;
             int maxBeatDrift = minSeg / 8;
-            float spawnTimeDeltaRemoval = iSec / 8;
-            float thres0 = average + totalComplexity * 1.0;
-            float thres1 = average + totalComplexity * 2.5;
+            float spawnTimeDeltaRemoval = iSec / 6;
+            float thres0 = adv + totalComplexity * 1.0;
+            float thres1 = adv + totalComplexity * 2.5;
 
             IntList beatTimes = new IntList();
             for(int i = 0; i < complexityArr.length; i++) {
@@ -217,10 +210,10 @@ class GameMap {
                     int overallOffset = 0;
                     while(i + t < complexityArr.length - beatLength * 2 && complexityArr[i + t] > thres0) {
                         beats.append(i + t);
-                        int optimalLocOffset = findLocalMaxOffset(complexityArr, i + t + beatLength, maxBeatDrift);
-                        overallOffset += optimalLocOffset;
-                        // if(overallOffset < maxBeatDrift && maxBeatDrift > -maxBeatDrift / 3) beatLength += optimalLocOffset;
                         t += beatLength;
+                        // int optimalLocOffset = findLocalMaxOffset(complexityArr, i + t + beatLength, maxBeatDrift);
+                        // overallOffset += optimalLocOffset;
+                        // if(overallOffset < maxBeatDrift && maxBeatDrift > -maxBeatDrift / 3) beatLength += optimalLocOffset;
                     }
                     if(beats.size() < minConsecutiveBeats) continue;
                     for(int beatTime : beats) {
@@ -233,7 +226,6 @@ class GameMap {
                         }
                         avoidTimings.append(beatTime);
                         if(invalidSpawn) continue;
-
                         beatTimes.append(beatTime);
                     }
                     i += 1 + int(beatLength * 2.5);
@@ -245,11 +237,11 @@ class GameMap {
             float r = -QUARTER_PI;
             float lastHeavySpawnTime = 0;
             for(int time : beatTimes) {
-                if(complexityArr[time] > thres1 && time - lastHeavySpawnTime > 1.5 * iSec) {
-                    createPattern("heavyBeat", time * sampSecFactor, complexityArr[time] * (1 + difficulty) / 2.0);
+                if(complexityArr[time] > thres1 && time - lastHeavySpawnTime > 2.5 * iSec / adjDifficulty) {
+                    createPattern("heavyBeat", time * sampSecFactor, complexityArr[time] * (1 + difficultySlider.val) / 2.0);
                     lastHeavySpawnTime = time;
                 }else{
-                    enemies.add(createEnemy(vec2(gameDisplaySize.x / 2, gameDisplaySize.y / 2), vec2((1 + difficulty) / 2, 0).rotate(r), time * sampSecFactor));
+                    enemies.add(createEnemy(vec2(gameDisplaySize.x / 2, gameDisplaySize.y / 2).add(rng.randVec((1 - adjDifficulty) * gameDisplaySize.y / 1.5)), vec2((1 + difficultySlider.val) / 2, 0).rotate(r), time * sampSecFactor));
                 }
                 r -= HALF_PI;
             }
