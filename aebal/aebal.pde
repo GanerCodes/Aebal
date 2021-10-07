@@ -24,13 +24,13 @@ PFont defaultFont, songFont;
 PGraphics back, loading_animation_buffer;
 boolean intense, allowDebugActions, cancerMode, keydown_SHIFT, checkTimes, songEndScreenSkippable, mouseOverSong, paused, show_fade_in = true;
 int patternTestLocIndex, patternTestVelIndex, curX, curY, monitorID, cancerCount, score, hitCount, gameFrameCount, durationInto, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1, nextVolumeSFXplay = -1, delayedSceneTimer = -1, clearEnemies = -1;
-float gameFrameRateTotal, scrollWait, fps_tracker, gameSelect_songSelect, gameSelectExtraYOffset, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, millisDelta, fadeDuration = 5000, fadeOpacityStart = 400, fadeOpacityEnd = 0, grayScaleTimer = 100, trailingAngle = 0, trailStrokeWeight = 4.5;
+float gameFrameRateTotal, nextFadeTime, scrollWait, fps_tracker, gameSelect_songSelect, gameSelectExtraYOffset, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, millisDelta, fadeDuration = 5000, fadeOpacityStart = 400, fadeOpacityEnd = 0, grayScaleTimer = 100, trailingAngle = 0, trailStrokeWeight = 4.5;
 String mapGenerationText, delayedSceneScene, settingsFileLoc, songDataFileLoc, previousScene, gameState = "title";
 RNG GFX_R, GAME_R;
 PVector pos, previousPos, randTrans, zeroVector, prevTrailLoc, screenSize, trailLoc, chroma_r, chroma_g, chroma_b;
 SFX[] soundList;
 Minim minim;
-color backColor, globalObjColor;
+color backColor, globalObjColor, trailColor;
 PImage screen, text_logo, image_gear, image_back, image_settings, image_paused;
 PShader loading_animation, bubbleShader, chroma, reduceOpacity, grayScale, bloom;
 DecimalFormat timerFormat;
@@ -43,7 +43,7 @@ HashMap<String, timingDisplayElement> timingDisplay;
 arrow a;
 debugList msgList;
 settingButton[] settings, settings_left, settings_right;
-settingButton DEBUG_INFO, TIMING_INFO, SHOW_SONG_GRAPH, DYNAMIC_BACKGROUND_COLOR, DO_POST_PROCESSING, DO_FANCY_TRAILS, BACKGROUND_BLOBS, BACKGROUND_FADE, SHOW_SONG_NAME, DO_HIT_PROMPTS, NO_DAMAGE, RGB_ENEMIES, DO_CHROMA, DO_SHAKE, SHOW_FPS;
+settingButton DEBUG_INFO, TIMING_INFO, SHOW_SONG_GRAPH, DYNAMIC_BACKGROUND_COLOR, DO_COLORFUL_TRAILS, DO_POST_PROCESSING, DO_FANCY_TRAILS, BACKGROUND_BLOBS, BACKGROUND_FADE, SHOW_SONG_NAME, DO_HIT_PROMPTS, NO_DAMAGE, RGB_ENEMIES, DO_CHROMA, DO_SHAKE, SHOW_FPS;
 button settings_button, back_button;
 buttonMenu monitorOptions;
 vol_slider volSlider;
@@ -165,15 +165,15 @@ void loadSong() {
     int loadSongStartTime = millis();
     mapGenerationText = "Loading";
     logmsg("Song complexity: " + str(songComplexity));
-    // try {
+    try {
         gameMap = new GameMap(songP.fileName, sketchPath("patterns.json"), screenSize, GAME_R);
-    // }catch(Throwable t) {
-    //     logf("Error in song load! \"%s\"", t);
-    //     mapGenerationText = "";
-    //     setSceneDelay("gameSelect", 3500);
-    //     fadeOpacityStart = 255;
-    //     fadeDuration = 500;
-    // }
+    }catch(Throwable t) {
+        logf("Error in song load! \"%s\"", t);
+        mapGenerationText = "";
+        setSceneDelay("gameSelect", 3500);
+        fadeOpacityStart = 255;
+        fadeDuration = 500;
+    }
     resetLevelBuffers();
     gameMap.song.setVol(volSlider.val);
     logmsg(String.format("Song arr length: %s; SPS: %s", gameMap.complexityArr.length, gameMap.complexityArr.length / (gameMap.song.length() / 1000.0)));
@@ -241,6 +241,7 @@ void resetLevel() {
     score = 0;
     hitCount = 0;
     levelSummary_timer = 0;
+    nextFadeTime = 0;
     textSFX.stop();
     a = new arrow(gameWidth / 2, gameHeight / 2, 0, 500, 1700);
     resetLevelBuffers();
@@ -272,8 +273,7 @@ void selectLevel(songElement song) {
                 bubbles.add(new bubble(vec2(GFX_R.rand(0, gameWidth), GFX_R.rand(0, gameHeight))));
             }
             logmsg("Random seed for \"" + song.title + "\": " + GAME_R.setSeed(song.title.hashCode()));
-            loadSong();
-            // thread("loadSong");
+            thread("loadSong");
         } break;
     }
 }
@@ -567,6 +567,7 @@ void setup() {
         BACKGROUND_BLOBS         = new settingButton(0, 0, 75, 75, 5, "Background Blobs"    , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
         SHOW_SONG_GRAPH          = new settingButton(0, 0, 75, 75, 5, "Show Intensity Graph", setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
         DO_FANCY_TRAILS          = new settingButton(0, 0, 75, 75, 5, "Fancy Trails"        , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
+        DO_COLORFUL_TRAILS       = new settingButton(0, 0, 75, 75, 5, "Colorful Trails"     , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
         BACKGROUND_FADE          = new settingButton(0, 0, 75, 75, 5, "Background Fade"     , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
         SHOW_SONG_NAME           = new settingButton(0, 0, 75, 75, 5, "Show Song Name"      , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
         DO_HIT_PROMPTS           = new settingButton(0, 0, 75, 75, 5, "Score Ticks"         , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
@@ -583,13 +584,14 @@ void setup() {
         DO_CHROMA,
         DYNAMIC_BACKGROUND_COLOR,
         DO_SHAKE,
+        SHOW_SONG_NAME,
         BACKGROUND_FADE,
         BACKGROUND_BLOBS
     };
     settings_right = new settingButton[] {
         DO_POST_PROCESSING,
         DO_FANCY_TRAILS,
-        SHOW_SONG_NAME,
+        DO_COLORFUL_TRAILS,
         DO_HIT_PROMPTS,
         SHOW_FPS,
         TIMING_INFO,
@@ -603,8 +605,6 @@ void setup() {
         settings_right[i].x = gameWidth - 100;
         settings_right[i].y = gameHeight / 1.65 - settings_right.length * 50 + i * 100;
     }
-
-    SHOW_SONG_GRAPH.state = true;
 
     settingsFileLoc = sketchPath("settings.json");
     songDataFileLoc = sketchPath("songData.json");
@@ -626,6 +626,7 @@ void setup() {
         NO_DAMAGE.state = false;
         DEBUG_INFO.state = false;
         TIMING_INFO.state = false;
+        SHOW_SONG_GRAPH.state = false;
         menuSettings = new JSONObject();
         for(settingButton b: settings) {
             menuSettings.setBoolean(b.txt, b.state);
@@ -855,7 +856,7 @@ void draw() {
         } break;
 
         case "performSongRenderings": {
-            if(SHOW_SONG_GRAPH.state) gameMap.drawIntensityGraph(intensityGraph);
+            if(allowDebugActions) gameMap.drawIntensityGraph(intensityGraph);
             setScene("game");
         } break;
         
@@ -916,10 +917,17 @@ void draw() {
                 background(0);
             }
 
-            if(BACKGROUND_FADE.state && frameCount % max(1, int(frameRate / 200)) == 0) {
-                TT("Fade");
-                back.filter(reduceOpacity);
-                TT("Fade");
+            if(BACKGROUND_FADE.state) {
+                if(adjMillis() > nextFadeTime) {
+                    TT("Fade");
+                    back.filter(reduceOpacity);
+                    TT("Fade");
+                    nextFadeTime = max(adjMillis() - 50, nextFadeTime + 1000.0 / 200.0);
+                }
+            }else{
+                back.beginDraw();
+                back.background(0);
+                back.endDraw();
             }
 
             if(BACKGROUND_BLOBS.state) {
@@ -940,7 +948,10 @@ void draw() {
                 back.image(bubbleLayer, 0, 0);
             }
             if(BACKGROUND_FADE.state) {
-                back.stroke(255);
+                if(DO_COLORFUL_TRAILS.state) {
+                    trailColor = lerpColor(trailColor, color((adjMillis() / 5.0) % 255, 255 * c, 255), 2.0 / frameRate);
+                }
+                back.stroke(DO_COLORFUL_TRAILS.state ? trailColor : 255);
                 if(DO_FANCY_TRAILS.state) {
                     back.noFill();
                     if(dist(previousPos.x, previousPos.y, pos.x, pos.y) > 0) {
@@ -969,9 +980,11 @@ void draw() {
                             bezierTangent(prevTrailLoc.y, newMiddle.y, closeMargin.y, trailLoc.y, 1),
                             bezierTangent(prevTrailLoc.x, newMiddle.x, closeMargin.x, trailLoc.x, 1)
                         );
-                        trailStrokeWeight = lerp(trailStrokeWeight, constrain(d / 3.75, 4.5, 10), 10 / frameRate);
+                        trailStrokeWeight = lerp(trailStrokeWeight, constrain(d / 2.0, 4.5, 10), 10 / frameRate);
                         back.strokeWeight(trailStrokeWeight);
+                        back.strokeCap(SQUARE);
                         back.bezier(prevTrailLoc.x, prevTrailLoc.y, newMiddle.x, newMiddle.y, closeMargin.x, closeMargin.y, trailLoc.x, trailLoc.y);
+                        back.strokeCap(PROJECT);
                     }
                 }else{
                     back.strokeWeight(5);
@@ -1026,7 +1039,7 @@ void draw() {
                 float prec = 0.5;
                 PVector nextChroma_r, nextChroma_g, nextChroma_b;
                 if(intense) {
-                    if(c >= 0.5 + songComplexity) {
+                    if(c >= 1.5) {
                         float offset = (2 * ((2 * c + 0.5) % 1) - 1) / 5;
                         float offset_y = GFX_R.rand(-c / 6, c / 6);
                         if(GFX_R.rand(0, 1) < 0.5) {
@@ -1099,7 +1112,7 @@ void draw() {
             fill(64);
             rect(gameWidth * durationComplete, gameHeight - 4, gameWidth, gameHeight);
 
-            if(SHOW_SONG_GRAPH.state) image(intensityGraph, 0, 0);
+            if(SHOW_SONG_GRAPH.state) image(intensityGraph, 0, -4);
 
             if(clearEnemies != -1) { //Used to avoid concurrentmodificationexception when clearing enemies when their drawn
                 resetEnemies(clearEnemies, time, true);
@@ -1410,14 +1423,6 @@ void keyPressed(KeyEvent e) {
             case "game": {
                 if(!allowDebugActions) break;
                 switch(keyCode) {
-                    case UP: {
-                        songComplexity += 0.1;
-                        logmsg("Increased song complexity (%s)", songComplexity);
-                    } break;
-                    case DOWN: {
-                        songComplexity -= 0.1;
-                        logmsg("Decreased song complexity (%s)", songComplexity);
-                    } break;
                     case LEFT: {
                         gameMap.song.skip(-15 * 1000);
                         gameMap.resetEnemiesWithIndex();
@@ -1429,6 +1434,9 @@ void keyPressed(KeyEvent e) {
                     } break;
                     default: {
                         switch(key) {
+                            case 'c': {
+                                SHOW_SONG_GRAPH.state = !SHOW_SONG_GRAPH.state;
+                            } break;
                             case 'i': {
                                 NO_DAMAGE.state = !NO_DAMAGE.state;
                                 logmsg(NO_DAMAGE.state ? "Enabled invincibility." : "Disabled invincibility");
@@ -1461,8 +1469,8 @@ void keyPressed(KeyEvent e) {
                                         break;
                                     }
                                     String[] newIndices = new String[] {
-                                        gameMap.spawner.locations.get (patternTestLocIndex).ID,
-                                        gameMap.spawner.velocities.get(patternTestVelIndex).ID
+                                        gameMap.spawner.locations.get (patternTestLocIndex %= gameMap.spawner.locations.size() ).ID,
+                                        gameMap.spawner.velocities.get(patternTestVelIndex %= gameMap.spawner.velocities.size()).ID
                                     };
                                     logf("Changed Pattern \"%s\"|\"%s\" --> \"%s\"|\"%s\"", currentIndices[0], currentIndices[1], newIndices[0], newIndices[1]);
                                     if(key == 'h') {

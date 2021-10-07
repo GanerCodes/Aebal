@@ -133,6 +133,9 @@ class GameMap {
     void resetEnemiesWithIndex() {
         spawnIndex = 0;
         enemies = new ArrayList<Enemy>();
+        for(Enemy e : enemies) {
+            e.locCalc = null;
+        }
     }
     void convertEnemiesToArray() {
         enemies.sort(new enemySpawnTimeSorter());
@@ -237,8 +240,8 @@ class GameMap {
             float r = -QUARTER_PI;
             float lastHeavySpawnTime = 0;
             for(int time : beatTimes) {
-                if(complexityArr[time] > thres1 && time - lastHeavySpawnTime > 2.5 * iSec / adjDifficulty) {
-                    createPattern("heavyBeat", time * sampSecFactor, complexityArr[time] * (1 + difficultySlider.val) / 2.0);
+                if(complexityArr[time] > thres1 && time - lastHeavySpawnTime > 2.5 * iSec / adjDifficulty && rng.randProp(adjDifficulty)) {
+                    createPattern("heavyBeat", time * sampSecFactor, complexityArr[time] * (1 + adjDifficulty));
                     lastHeavySpawnTime = time;
                 }else{
                     enemies.add(createEnemy(vec2(gameDisplaySize.x / 2, gameDisplaySize.y / 2).add(rng.randVec((1 - adjDifficulty) * gameDisplaySize.y / 1.5)), vec2((1 + difficultySlider.val) / 2, 0).rotate(r), time * sampSecFactor));

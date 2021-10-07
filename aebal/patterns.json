@@ -61,15 +61,16 @@
     },
     "locVelMap": {
         "common": "linearRandomDirection",
-        "solidTriangle, solidCircle, field, linearUp": "linearUp",
+        "field": "linearUp",
+        "solidTriangle, solidCircle": "linearShrink",
         "heart, triangle, circle": {
             "linearShrink": 0.55,
             "90deg": 0.3,
             "crissCross": 0.15
         },
         "solidSquare": {
-            "linearUp": 0.7,
-            "crissCross": 0.3
+            "linearUp": 0.9,
+            "crissCross": 0.1
         },
         "square": {
             "linearShrink": 0.4,
@@ -123,10 +124,10 @@
             "equationY": "13*cos(t)-5*cos(2*t)-2*cos(3*t)-cos(4*t)",
             "angleSweep": "pi, 9.42477796077",
             "transform": [
-                {"scale": "0.2"}
+                {"scale": "0.15"}
             ],
             "countBounds": "16, 23",
-            "scaleBounds": "0.5, 0.8",
+            "scaleBounds": "0.65, 0.8",
             "distBounds": "0, 0.6",
             "speedBounds": "0.4, 0.6",
             "modifiers": ["evenSpacing"]
@@ -134,14 +135,14 @@
         "triangle": {
             "equationX": "cos(t)/(abs(sin(t)+abs(cos(t)))+abs(cos(t)))",
             "equationY": "sin(t)/(abs(sin(t)+abs(cos(t)))+abs(cos(t)))",
-            "scaleBounds": "0.5, 0.8",
+            "scaleBounds": "0.65, 0.8",
             "speedBounds": "0.4, 0.6",
             "modifiers": ["evenSpacing"]
         },
         "square": {
             "equationX": "cos(t)/max(abs(cos(t)), abs(sin(t)))",
             "equationY": "sin(t)/max(abs(cos(t)), abs(sin(t)))",
-            "scaleBounds": "0.5, 0.8",
+            "scaleBounds": "0.65, 0.8",
             "distBounds": "0, 0.25",
             "speedBounds": "0.4, 0.6",
             "modifiers": ["evenSpacing"]
@@ -174,7 +175,6 @@
             "modifiers": ["disableRotationStacking"]
         },
         "crissCross": {
-            "difficulty": 1,
             "equationX": "cos(t + pi / 2)",
             "equationY": "-sin(t + pi / 2)",
             "spawnMode": 0,
@@ -189,17 +189,15 @@
             "modifiers": ["disableRandomRotation"]
         },
         "shrinker": {
-            "difficulty": "1",
             "equationX": "1",
             "equationY": "sin(t)*cos(t)/2",
             "countBonds": "0.45, 0.75"
         },
         "linearShrink": {
-            "difficulty": "1",
             "equationX": "0",
             "equationY": "1",
-            "speedBounds": "1, 2.15",
-            "scaleBounds": "0.2, 0.65",
+            "speedBounds": "1, 2",
+            "scaleBounds": "0.2, 0.7",
             "modifiers": ["disableRandomRotation"]
         },
         "90deg": {

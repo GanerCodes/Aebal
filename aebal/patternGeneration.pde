@@ -291,7 +291,7 @@ class PatternSpawner {
     }
 
     ArrayList<Enemy> makePattern(GameMap gameMap, String loc, String vel, RNG rng, float time, float intensity, float difficulty) {
-        return generatePattern(locIDMap.get(loc), velIDMap.get(vel), gameMap, rng, time, getWeighedRandom(rng, intensity, difficulty));
+        return generatePattern(locIDMap.get(loc), velIDMap.get(vel), gameMap, rng, time, intensity, difficulty);
     }
     ArrayList<Enemy> makePatternFromLocation(GameMap gameMap, String loc, RNG rng, float time, float intensity, float difficulty) {
         return makePattern(gameMap, loc, locVelMap.get(loc).generate(rng, difficulty, intensity), rng, time, intensity, difficulty);
@@ -409,15 +409,18 @@ class PatternSpawner {
         throw new Exception("Pattern Parsing Error: Couldn't parse bounds");
     }
 
-    ArrayList<Enemy> generatePattern(Equation locEq, Equation2D velEq, GameMap gameMap, RNG rng, float time, float iLerp) {
+    ArrayList<Enemy> generatePattern(Equation locEq, Equation2D velEq, GameMap gameMap, RNG rng, float time, float intensity, float difficulty) {
         EnemyPatternProperties locationProps = locEq.spawnProperties;
         EnemyPatternProperties velocityProps = velEq.spawnProperties;
         ArrayList<PVector> locs = new ArrayList();
         ArrayList<PVector> vels = new ArrayList();
         
-        int   count        = round(lerpCentered(locationProps.countBounds, iLerp) * lerpCentered(velocityProps.countBounds, iLerp));
-        float speed        =       lerpCentered(velocityProps.speedBounds, iLerp) * lerpCentered(locationProps.speedBounds, iLerp) ;
-        float locScale     =       lerpCentered(locationProps.scaleBounds, iLerp) * lerpCentered(velocityProps.scaleBounds, iLerp) ;
+        float[] lerps = new float[3];
+        for(int i = 0; i < lerps.length; i++) lerps[i] = getWeighedRandom(rng, intensity, difficulty);
+        
+        int   count        = round(lerpCentered(locationProps.countBounds, lerps[0]) * lerpCentered(velocityProps.countBounds, lerps[0]));
+        float speed        =       lerpCentered(velocityProps.speedBounds, lerps[1]) * lerpCentered(locationProps.speedBounds, lerps[1]) ;
+        float locScale     =       lerpCentered(locationProps.scaleBounds, lerps[2]) * lerpCentered(velocityProps.scaleBounds, lerps[2]) ;
 
         PVector locDistAdj = new PVector(
             0.5 * rng.randSgn(lerpCentered(locationProps.distBounds, rng.rand()) * gameMap.gameDisplaySize.x),
