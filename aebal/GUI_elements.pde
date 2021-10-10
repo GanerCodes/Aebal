@@ -192,34 +192,35 @@ class slider {
         circle(getMappedVal(), y, h * ballHfactor);
         if(txt != null) {
             text(txt, x, y + g.textSize / 1.5 * (g.textAlignY == BOTTOM ? -1 : 1));
-        } 
+        }
     }
 }
 
 class vol_slider extends slider {
-    //Because an option to inherent constructors would be just too good wouldn't it
-    vol_slider(float x, float y, float w, float h, float val, float val_min, float val_max, color clr_line, color clr_ball, color clr_line_hover, color clr_ball_hover, color clr_line_active, color clr_ball_active) {
-        super(x, y, w, h, val, val_min, val_max, null, clr_line, clr_ball, clr_line_hover, clr_ball_hover, clr_line_active, clr_ball_active);
-    }
-    vol_slider(float x, float y, float w, float h, float val, float val_min, float val_max, color clr, color clr_hover, color clr_active) {
-        super(x, y, w, h, val, val_min, val_max, null, clr, clr, clr_hover, clr_hover, clr_hover, clr_active);
-    }
+    int nextVolumeSFXplay = -1;
     vol_slider(float x, float y, float w, float h, float val, float val_min, float val_max, String txt, color clr_line, color clr_ball, color clr_line_hover, color clr_ball_hover, color clr_line_active, color clr_ball_active) {
         super(x, y, w, h, val, val_min, val_max, txt , clr_line, clr_ball, clr_line_hover, clr_ball_hover, clr_line_active, clr_ball_active);
     }
-    vol_slider(float x, float y, float w, float h, float val, float val_min, float val_max, String txt, color clr, color clr_hover, color clr_active) {
-        super(x, y, w, h, val, val_min, val_max, txt , clr, clr, clr_hover, clr_hover, clr_hover, clr_active);
+    void onRelease() {
+        activate();
+        volChangeSFX.setVol(val);
+        volChangeSFX.play();
+    }
+    void onScroll()  { nextVolumeSFXplay = millis() + 100; }
+    void activate()  { setSFXvol(val); }
+}
+class music_slider extends slider {
+    int nextVolumeSFXplay = -1;
+    music_slider(float x, float y, float w, float h, float val, float val_min, float val_max, String txt, color clr_line, color clr_ball, color clr_line_hover, color clr_ball_hover, color clr_line_active, color clr_ball_active) {
+        super(x, y, w, h, val, val_min, val_max, txt , clr_line, clr_ball, clr_line_hover, clr_ball_hover, clr_line_active, clr_ball_active);
     }
     void onRelease() {
         activate();
+        volChangeSFX.setVol(val);
         volChangeSFX.play();
     }
-    void onScroll() {
-        nextVolumeSFXplay = millis() + 100;
-    }
-    void activate() {
-        setGlobalVolume(val);
-    }
+    void onScroll()  { nextVolumeSFXplay = millis() + 100; }
+    void activate()  { setMusicvol(val); }
 }
 
 class difficulty_slider extends slider {

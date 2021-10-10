@@ -23,9 +23,9 @@ SFX hitSound, buttonSFX, textSFX, volChangeSFX, songSelChange, gainScore;
 PFont defaultFont, songFont;
 PGraphics back, loading_animation_buffer;
 boolean intense, allowDebugActions, cancerMode, keydown_SHIFT, checkTimes, songEndScreenSkippable, mouseOverSong, paused, show_fade_in = true;
-int patternTestLocIndex, patternTestVelIndex, curX, curY, monitorID, cancerCount, score, hitCount, gameFrameCount, durationInto, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1, nextVolumeSFXplay = -1, delayedSceneTimer = -1, clearEnemies = -1;
-float gameFrameRateTotal, nextFadeTime, scrollWait, fps_tracker, gameSelect_songSelect, gameSelectExtraYOffset, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, millisDelta, fadeDuration = 5000, fadeOpacityStart = 400, fadeOpacityEnd = 0, grayScaleTimer = 100, trailingAngle = 0, trailStrokeWeight = 4.5;
-String mapGenerationText, delayedSceneScene, settingsFileLoc, songDataFileLoc, previousScene, gameState = "title";
+int previewFadeStartTime, nextAllowedSongPreviewTime, patternTestLocIndex, patternTestVelIndex, curX, curY, monitorID, cancerCount, score, hitCount, gameFrameCount, durationInto, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1, delayedSceneTimer = -1, clearEnemies = -1;
+float songPreviewLevel, gameFrameRateTotal, nextFadeTime, scrollWait, fps_tracker, gameSelect_songSelect, gameSelectExtraYOffset, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, millisDelta, fadeDuration = 5000, fadeOpacityStart = 400, fadeOpacityEnd = 0, grayScaleTimer = 100, trailingAngle = 0, trailStrokeWeight = 4.5;
+String mapGenerationText, delayedSceneScene, settingsFileLoc, previousScene, gameState = "title";
 RNG GFX_R, GAME_R;
 PVector pos, previousPos, randTrans, zeroVector, prevTrailLoc, screenSize, trailLoc, chroma_r, chroma_g, chroma_b;
 SFX[] soundList;
@@ -46,11 +46,12 @@ settingButton[] settings, settings_left, settings_right;
 settingButton DEBUG_INFO, TIMING_INFO, SHOW_SONG_GRAPH, DYNAMIC_BACKGROUND_COLOR, DO_COLORFUL_TRAILS, DO_POST_PROCESSING, DO_FANCY_TRAILS, BACKGROUND_BLOBS, BACKGROUND_FADE, SHOW_SONG_NAME, DO_HIT_PROMPTS, NO_DAMAGE, RGB_ENEMIES, DO_CHROMA, DO_SHAKE, SHOW_FPS;
 button settings_button, back_button;
 buttonMenu monitorOptions;
-vol_slider volSlider;
+vol_slider sfxSlider;
+music_slider musicSlider;
 difficulty_slider difficultySlider;
-JSONObject menuSettings, songCache;
+JSONObject menuSettings;
 asyncSubprocess songDownloadProcess;
-songElement songP;
+songElement gameSong, songPreview, previousSongPreview;
 
 //Constants
 final String SFX_PATH_PREFIX = "assets/SFX/";
@@ -94,6 +95,13 @@ void setScene(String scene) {
     sceneOffsetMillis = adjMillis();
     gameFrameCount = 0;
     gameFrameRateTotal = 0;
+    switch(previousScene) {
+        case "gameSelect": {
+            if(songPreview != null && songPreview.music != null) songPreview.music.stop();
+            songPreview = null;
+            previousSongPreview = null;
+        } break;
+    }
     logmsg(String.format("Setting scene (%s --> %s)", previousScene, scene));
 }
 
@@ -108,7 +116,7 @@ void returnScene() {
 }
 
 void gotoLevelSelect() {
-    gameMap.song.stop();
+    if(gameMap != null) gameMap.song.stop();
     setScene("gameSelect");
     resetLevel();
     screenshot();
@@ -132,7 +140,7 @@ void setKeys(boolean state) {
 void updateMonitorOptions() {
     monitorOptions.buttons = new ArrayList();
     int i = 0;
-    for(String m: getMonitors()) {
+    for(String m : getMonitors()) {
         monitorOptions.addButton(m);
         if(++i == monitorID) monitorOptions.setState();
     }
@@ -166,7 +174,7 @@ void loadSong() {
     mapGenerationText = "Loading";
     logmsg("Song complexity: " + str(songComplexity));
     try {
-        gameMap = new GameMap(songP.fileName, sketchPath("patterns.json"), screenSize, GAME_R);
+        gameMap = new GameMap(gameSong.fileName, sketchPath("patterns.json"), screenSize, GAME_R);
     }catch(Throwable t) {
         logf("Error in song load! \"%s\"", t);
         mapGenerationText = "";
@@ -175,7 +183,7 @@ void loadSong() {
         fadeDuration = 500;
     }
     resetLevelBuffers();
-    gameMap.song.setVol(volSlider.val);
+    gameMap.song.setVol(musicSlider.val);
     logmsg(String.format("Song arr length: %s; SPS: %s", gameMap.complexityArr.length, gameMap.complexityArr.length / (gameMap.song.length() / 1000.0)));
     logf("Level Load and Generation took %ss.", (millis() - loadSongStartTime) / 1000.0);
     
@@ -187,9 +195,12 @@ SFX makeSFX(String name, float defaultVol) {
     return new SFX(sketchPath(SFX_PATH_PREFIX + name), defaultVol);
 }
 
-void setGlobalVolume(float vol) {
-    if(vol == volSlider.val_min) vol = -10000;
-    for(SFX s: soundList) s.setVol(vol);
+void setSFXvol(float vol) {
+    if(vol == sfxSlider.val_min) vol = -10000;
+    for(SFX s : soundList) s.setVol(vol);
+}
+void setMusicvol(float vol) {
+    if(vol == musicSlider.val_min) vol = -10000;
     if(gameMap != null && gameMap.song.isLoaded()) gameMap.song.setVol(vol);
 }
 
@@ -251,6 +262,23 @@ String fileName(String path) {
     return new File(path).getName().replaceFirst("[.][^.]+$", "");
 }
 
+
+void stopSongPreview() {
+    songPreview.music.stop();
+}
+void playSongPreview() {
+    if(previousSongPreview != null && previousSongPreview.music != null && previousSongPreview.music.isPlaying()) {
+        previousSongPreview.music.pause();
+    }
+    float newVol = lerp(musicSlider.val, musicSlider.val_min, 0.80);
+    songPreview.music.setVol(newVol);
+    songPreview.setCueToLoopStart();
+    songPreview.music.sound.loop(0);
+    
+    songPreview.music.sound.shiftGain(-80, newVol, 1000);
+    previewFadeStartTime = millis();
+}
+
 void selectLevel(songElement song) {
     switch(song.fileName) {
         case "///addSong": {
@@ -263,7 +291,7 @@ void selectLevel(songElement song) {
             songDownloadProcess = tryDownloadFromClipboard();
         } break;
         default: {
-            songP = song;
+            gameSong = song;
             setScene("load_song");
             resetLevel();
             bubbles = new ArrayList();
@@ -280,7 +308,7 @@ void selectLevel(songElement song) {
 
 void songSelected(File file) {
     if(file == null) return;
-    songList.add(songList.size() - 1, new songElement(songCache, file.getAbsolutePath()));
+    songList.add(songList.size() - 1, new songElement(file.getAbsolutePath()));
     try {
         Files.copy(Paths.get(file.getAbsolutePath()), Paths.get(sketchPath("songs/" + file.getName())));
     } catch (IOException e) {
@@ -294,61 +322,44 @@ float adjMillis() {
 
 class songElement {
     String author, duration, title, fileName;
-    JSONObject songCacheDir;
+    Music music;
     songElement(String fileName, String title) {
         this.fileName = fileName;
         this.title = title;
     }
-    songElement(JSONObject songCacheDir, String fileName) {
-        this.songCacheDir = songCacheDir;
+    songElement(String fileName) {
         this.fileName = fileName;
         this.title = fileName(fileName);
-        if(songCacheDir.isNull(title) || REFRESH_SONG_METADATA) {
-            Music songTmp = new Music(fileName, 0);
-            AudioMetaData metadata = songTmp.sound.getMetaData();
-            JSONObject songData = new JSONObject();
-            if(metadata.author() != null) {
-                author = metadata.author();
-                songData.setString("author", author);
-            }
-            if(metadata.length() > 0) {
-                duration = durToString(metadata.length());
-                songData.setString("duration", duration);
-            }
-            songCacheDir.setJSONObject(title, songData);
-        }else{
-            JSONObject songMeta = songCacheDir.getJSONObject(title);
-            if(!songMeta.isNull("author")) this.author = songMeta.getString("author");
-            if(!songMeta.isNull("duration")) this.duration = songMeta.getString("duration");
-        }
+        this.music = new Music(fileName, 0);
+        resetLoopPoints();
+        AudioMetaData metadata = music.sound.getMetaData();
+        if(metadata.author() != null) author = metadata.author();
+        if(metadata.length() > 0) duration = durToString(metadata.length());
+    }
+    void resetLoopPoints() {
+        music.sound.setLoopPoints(int(music.length() / 2.4), music.length());
+    }
+    void setCueToLoopStart() {
+        music.sound.cue(int(music.length() / 2.4));
     }
     String durToString(int dur) {
         return dur / (60 * 1000) + ":" + nf((dur / 1000) % 60, 2);
     }
     String toString() {
-        return (author != null && author.length() > 0 ? author + ": " : "") + songP.title + " (" + songP.duration + ")";
+        return (author != null && author.length() > 0 ? author + ": " : "") + title + " (" + duration + ")";
     }
 }
 
 void initializeSongs() {
     songList = new ArrayList();
-    try {
-        assert new File(sketchPath(songDataFileLoc)).isFile();
-        songCache = loadJSONObject(songDataFileLoc);
-    } catch (Throwable e) {
-        logmsg("Song data file not found or was corrupt: " + e);
-        songCache = new JSONObject();
-    }
-
-    for(String songName: new File(sketchPath("Songs")).list()) {
+    for(String songName : new File(sketchPath("Songs")).list()) {
         try {
-            songElement songElm = new songElement(songCache, sketchPath("Songs/" + songName));
+            songElement songElm = new songElement(sketchPath("Songs/" + songName));
             songList.add(songElm);
         } catch (Throwable e) {
             logmsg("Song unreadable: " + songName);
         }
     }
-    saveJSONObject(songCache, songDataFileLoc);
     songList.add(new songElement("///addSong", "+ Add Song"));
     songList.add(new songElement("///download", "+ Youtube-dl [Clipboard]"));
 
@@ -373,7 +384,7 @@ class bubble {
         loc.add(PVector.mult(vel, max(0.01, pow(2 * max(0.01, c - 0.08), 3))));
 
         PVector adv = vec2();
-        for(bubble b: bubbles) {
+        for(bubble b : bubbles) {
             adv.add(b.loc);
         }
         vel.sub(adv.div(bubbles.size()).sub(loc).normalize().div(125));
@@ -398,7 +409,7 @@ void drawBubbles(PGraphics base) {
     FloatList coord_y = new FloatList();
     FloatList timeOff = new FloatList();
     float currentTime = adjMillis() / 1000.0;
-    for(bubble b: bubbles) {
+    for(bubble b : bubbles) {
         coord_x.append(b.loc.x / gameWidth);
         coord_y.append(1 - b.loc.y / height);
         timeOff.append(currentTime + b.timer_offset);
@@ -558,7 +569,8 @@ void setup() {
     color setting_default_f_over = #FF0000;
     color setting_default_f_active = #FF9999;
 
-    volSlider = new vol_slider(gameWidth / 2, gameHeight / 1.175, 600, 35, 0, -30, 20, "Volume", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
+    sfxSlider = new vol_slider(gameWidth / 2, gameHeight / 1.175 + 50, 600, 35     , 0, -40, 20, "SFX", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
+    musicSlider = new music_slider(gameWidth / 2, gameHeight / 1.175 - 160, 600, 35, 0, -40, 20, "Music", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
     difficultySlider = new difficulty_slider(1357, gameHeight * 4 / 5, 500, 35, songComplexity, 0.5, 1.1, "Difficulty", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
     monitorOptions = new buttonMenu(165, 65, 200, 30, color(225), color(220), color(215), color(30), color(40), color(50));
     settings = new settingButton[] {
@@ -607,7 +619,6 @@ void setup() {
     }
 
     settingsFileLoc = sketchPath("settings.json");
-    songDataFileLoc = sketchPath("songData.json");
     try {
         assert sketchFile(settingsFileLoc).isFile();
         menuSettings = loadJSONObject(settingsFileLoc);
@@ -616,7 +627,8 @@ void setup() {
                 b.state = menuSettings.getBoolean(b.txt);
             }
         }
-        if(!menuSettings.isNull("volume")) volSlider.val = menuSettings.getFloat("volume");
+        if(!menuSettings.isNull("volume"  )) sfxSlider  .val = menuSettings.getFloat("volume"  );
+        if(!menuSettings.isNull("musicVol")) musicSlider.val = menuSettings.getFloat("musicVol");
         if(!menuSettings.isNull("intensity")) {
             difficultySlider.val = menuSettings.getFloat("intensity");
             difficultySlider.onChange();
@@ -628,7 +640,7 @@ void setup() {
         TIMING_INFO.state = false;
         SHOW_SONG_GRAPH.state = false;
         menuSettings = new JSONObject();
-        for(settingButton b: settings) {
+        for(settingButton b : settings) {
             menuSettings.setBoolean(b.txt, b.state);
         }
         menuSettings.setInt("monitorID", 1);
@@ -641,9 +653,11 @@ void setup() {
     image_settings = loadImage(sketchPath("assets/Images/settings.png"));
     image_paused = loadImage(sketchPath("assets/Images/paused.png"));
 
+    songPreviewLevel = gameHeight * 8 / 9;
     initializeSongs();
-    setGlobalVolume(volSlider.val);
-
+    setSFXvol(sfxSlider.val);
+    setMusicvol(musicSlider.val);
+    
     settings_button = new button(gameWidth - 65, gameHeight - 65, 85, 85, 5, image_gear, color(45), color(75), color(128));
     back_button = new button(65, gameHeight - 65, 85, 85, 5, image_back, color(45), color(75), color(128));
 
@@ -746,6 +760,11 @@ void draw() {
             strokeWeight(8);
             strokeCap(ROUND);
             line(gameWidth / 2, gameHeight * 1 / 4, gameWidth / 2, gameHeight * 8 / 9);
+            if(songPreview != null && songPreview.music != null && songPreview.music.isPlaying()) {
+                songPreviewLevel = lerp(songPreviewLevel, map(songPreview.music.sound.mix.level() * min((millis() - previewFadeStartTime) / 1000.0, 1), 0, 1, gameHeight * 8 / 9, gameHeight * 1 / 4), 10.0 / frameRate);
+                stroke(255);
+                line(gameWidth / 2, gameHeight * 8 / 9, gameWidth / 2, songPreviewLevel);
+            }
             strokeCap(PROJECT);
             imageMode(CENTER);
             image(text_logo, gameWidth / 2, text_logo.height / 2);
@@ -786,10 +805,10 @@ void draw() {
                     offset_y_tmp = newlineCount * fontSize / 2.0;
                     y_offset += offset_y_tmp;
                     if(fontSize > 2) {
+                        float txtWid = textWidth(songTitle);
+                        float sw = txtWid / 2;
                         text(songTitle, gameWidth / 2, 250 + y_offset);
                         if(i == gameSelect_songSelect_actual) {
-                            float txtWid = textWidth(songTitle);
-                            float sw = txtWid / 2;
                             float border_expand_y = 27.5 * (newlineCount + 1);
                             if(curX - tx > gameWidth / 2 - (60 + sw) && curX - tx < gameWidth / 2 + (60 + sw) && curY - ty > 250 + y_offset + 6.75 - border_expand_y && curY - ty < 250 + y_offset + 6.75 + border_expand_y) {
                                 mouseOverSong = true;
@@ -814,6 +833,17 @@ void draw() {
                                 gameWidth / 2 - sw - 55, 250 + y_offset + 6.75 + 20);
 
                             if(i != songList.size() - 1) {
+                                if(songPreview != currentElement) {
+                                    if(millis() > nextAllowedSongPreviewTime) {
+                                        previousSongPreview = songPreview;
+                                        songPreview = currentElement;
+                                        thread("playSongPreview");
+                                        nextAllowedSongPreviewTime = millis() + 2000;
+                                    }else if(songPreview != null && songPreview.music != null && songPreview.music.isPlaying()) {
+                                        thread("stopSongPreview");
+                                    }
+                                }
+                                
                                 float descSize = 40;
                                 textSize(descSize);
                                 textLeading(descSize + 5);
@@ -897,7 +927,7 @@ void draw() {
             }
 
             if(BACKGROUND_BLOBS.state) {
-                for(bubble b: bubbles) {
+                for(bubble b : bubbles) {
                     b.update();
                 }
             }
@@ -1101,7 +1131,7 @@ void draw() {
                 fill(255, 200);
                 textFont(songFont, 48);
                 textAlign(LEFT, BOTTOM);
-                text(songP.title, 10, gameHeight - 10);
+                text(gameSong.title, 10, gameHeight - 10);
             }
 
             //Duration bar
@@ -1165,22 +1195,30 @@ void draw() {
 
             textFont(defaultFont, 32);
             textAlign(LEFT, CENTER);
-            for(settingButton b: settings_left) {
+            for(settingButton b : settings_left) {
                 b.draw();
             }
             textAlign(RIGHT, CENTER);
-            for(settingButton b: settings_right) {
+            for(settingButton b : settings_right) {
                 b.draw();
             }
             textSize(60);
             textAlign(CENTER, BOTTOM);
-            volSlider.txt = "Volume - " + int(map(volSlider.val, volSlider.val_min, volSlider.val_max, 0, 100)) + '%';
-            volSlider.draw();
+            sfxSlider.txt = "SFX - " + int(map(sfxSlider.val, sfxSlider.val_min, sfxSlider.val_max, 0, 100)) + '%';
+            musicSlider.txt = "Music - " + int(map(musicSlider.val, musicSlider.val_min, musicSlider.val_max, 0, 100)) + '%';
+            
+            sfxSlider.draw();
+            musicSlider.draw();
             back_button.draw();
             monitorOptions.draw();
-            if(nextVolumeSFXplay > 0 && millis() > nextVolumeSFXplay) {
-                volSlider.onRelease();
-                nextVolumeSFXplay = -1;
+            
+            if(sfxSlider.nextVolumeSFXplay > 0 && millis() > sfxSlider.nextVolumeSFXplay) {
+                sfxSlider.onRelease();
+                sfxSlider.nextVolumeSFXplay = -1;
+            }
+            if(musicSlider.nextVolumeSFXplay > 0 && millis() > musicSlider.nextVolumeSFXplay) {
+                musicSlider.onRelease();
+                musicSlider.nextVolumeSFXplay = -1;
             }
         } break;
         case "load_song": {
@@ -1240,9 +1278,9 @@ void draw() {
             rectMode(CENTER);
             textFont(songFont, 72);
             fill(255);
-            text(songP.title, gameWidth / 2, gameHeight / 4.5, 1111, gameHeight);
+            text(gameSong.title, gameWidth / 2, gameHeight / 4.5, 1111, gameHeight);
             textAlign(LEFT, CENTER);
-            float titleWidth = min(1111, textWidth(songP.title)) / 2;
+            float titleWidth = min(1111, textWidth(gameSong.title)) / 2;
             textFont(songFont, 40);
             float calculatedScore = float(score) / (1 + sqrt(float(hitCount))) * pow(1.4 * (songComplexity), 3);
             text("Score:\t\t " + adjustedScore + "\nHit Count:\t\t " + adjustedHitCount + "\nGrade:\t\t " + calculatedScore, gameWidth / 2 - titleWidth, gameHeight / 2.33);
@@ -1363,7 +1401,9 @@ void draw() {
 
 void exit() {
     logmsg("Exiting, saving settings.");
-    menuSettings.setFloat("volume", volSlider.val);
+    menuSettings.setFloat("volume", sfxSlider.val);
+    menuSettings.setFloat("musicVol", musicSlider.val);
+    
     menuSettings.setFloat("intensity", difficultySlider.val);
     if(monitorID != monitorOptions.selectedIndex + 1) {
         monitorID = monitorOptions.selectedIndex + 1;
@@ -1399,7 +1439,8 @@ void keyPressed(KeyEvent e) {
                 case "settings": {
                     screenshot();
                     returnScene();
-                    volSlider.activate();
+                    sfxSlider.activate();
+                    musicSlider.activate();
                 } break;
                 case "gameSelect": {
                     exit();
@@ -1510,10 +1551,11 @@ void keyReleased() {
 
 void mousePressed() {
     if(gameState.equals("settings")) {
-        for(settingButton b: settings) {
+        for(settingButton b : settings) {
             b.checkMouse(MOUSE_PRESS);
         }
-        volSlider.checkMouse(MOUSE_PRESS);
+        sfxSlider.checkMouse(MOUSE_PRESS);
+        musicSlider.checkMouse(MOUSE_PRESS);
         monitorOptions.checkMouse(MOUSE_PRESS);
     }else if(gameState.equals("gameSelect")) {
         difficultySlider.checkMouse(MOUSE_PRESS);
@@ -1535,15 +1577,17 @@ void mouseReleased() {
     }
     switch(gameState) {
         case "settings": {
-            for(settingButton b: settings) {
+            for(settingButton b : settings) {
                 b.checkMouse(MOUSE_RELEASE);
             }
-            volSlider.checkMouse(MOUSE_RELEASE);
+            sfxSlider.checkMouse(MOUSE_RELEASE);
+            musicSlider.checkMouse(MOUSE_RELEASE);
             monitorOptions.checkMouse(MOUSE_RELEASE);
             if(back_button.active && back_button.checkMouse(MOUSE_RELEASE)) {
                 screenshot();
                 returnScene();
-                volSlider.activate();
+                sfxSlider.activate();
+                musicSlider.activate();
             }
         } break;
         case "gameSelect": {
@@ -1581,9 +1625,18 @@ void mouseWheel(processing.event.MouseEvent event) {
     if(!focused) return;
     float e = ((com.jogamp.newt.event.MouseEvent) event.getNative()).getRotation()[1]; //JAVA MOMENT
     if(e == 0) return;
-    if(gameState.equals("game") || (gameState.equals("settings") && volSlider.checkMouse(MOUSE_OVER))) {
-        volSlider.checkScroll(e);
-        volSlider.activate();
+    if(gameState.equals("game")) {
+        musicSlider.checkScroll(e);
+        musicSlider.activate();
+    }else if(gameState.equals("settings")) {
+        if(sfxSlider.checkMouse(MOUSE_OVER)) {
+            sfxSlider.checkScroll(e);
+            sfxSlider.activate();
+        }
+        if(musicSlider.checkMouse(MOUSE_OVER)) {
+            musicSlider.checkScroll(e);
+            musicSlider.activate();
+        }
     }else if(gameState.equals("gameSelect")) {
         if(difficultySlider.checkMouse(MOUSE_OVER)) {
             difficultySlider.checkScroll(e);
