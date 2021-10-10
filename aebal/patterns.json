@@ -198,6 +198,7 @@
             "equationY": "1",
             "speedBounds": "1, 2",
             "scaleBounds": "0.2, 0.7",
+            "countBounds": "1.0, 0.5",
             "modifiers": ["disableRandomRotation"]
         },
         "90deg": {

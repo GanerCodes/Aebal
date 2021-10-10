@@ -78,6 +78,7 @@ class SFX extends Sound {
 }
 
 class Music extends Sound {
+    int previousSongPosition, previousTime;
     AudioPlayer sound;
     Music(String soundName, float defaultVolume) {
         super(soundName, defaultVolume);
@@ -89,7 +90,7 @@ class Music extends Sound {
         return sound != null;
     }
     void loadSound(String soundName) {
-        this.sound = minim.loadFile(soundName, 256); //I don't think your supposed to do this but without it .position doesn't update fast enough 
+        this.sound = minim.loadFile(soundName, 1024);
         setVol(volume);
     }
     void setVol(float volume) {
@@ -110,11 +111,26 @@ class Music extends Sound {
     int position() {
         return sound.position();
     }
+    int getPositionAdjusted() {
+        int pos = sound.position();
+        if(pos != previousSongPosition) {
+            previousSongPosition = pos;
+            previousTime = int(millis());
+            return pos;
+        }else{
+            return previousSongPosition + int(millis()) - previousTime;
+        }
+    }
+    float getAdjustedTime() {
+        return float(getPositionAdjusted()) / 1000.0;
+    }
     void pause() {
         sound.pause();
     }
     void unpause() {
         sound.play();
+        previousSongPosition = position();
+        previousTime = int(millis());
     }
     void cue(int i) {
         sound.cue(i);

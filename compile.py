@@ -13,6 +13,13 @@ if doExport:
     shutil.copytree("gameSongs", songDir := "aebalExport/songs")
     shutil.copytree("aebal/assets", assetDir := "aebalExport/assets")
     shutil.make_archive("aebal", 'zip', "aebalExport")
+    
+    if os.path.isdir("build"):
+        shutil.rmtree(f"build")
+    
+    shutil.move("aebalExport", "build/aebal")
+    os.rename("aebalExport.zip", "build/aebal.zip")
+    
     # shutil.rmtree(f"aebalExport")
 
 fileList = []

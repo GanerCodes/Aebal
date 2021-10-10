@@ -103,7 +103,7 @@ class GameMap {
     void addRecentEnemies(float time) {
         while(spawnIndex < enemySpawns.length && time >= enemySpawns[spawnIndex].spawnTime) {
             Enemy e = enemySpawns[spawnIndex];
-            if(time < e.despawnTime) {
+            if(time < e.despawnTime && e.spawnTime > 0) {
                 enemies.add(e);
                 if(allowDebugActions && e.spawnInfo != null) logmsg("Spawned Enemy: " + e.spawnInfo);
             }
@@ -129,13 +129,14 @@ class GameMap {
     float getIntensity(float time) {
         return complexityArr[getIntensityIndex(time)];
     }
-    
     void resetEnemiesWithIndex() {
+        if(enemySpawns != null) {
+            for(int i = 0; i < min(spawnIndex, enemySpawns.length); i++) {
+                enemySpawns[i].locCalc = null;
+            }
+        }
         spawnIndex = 0;
         enemies = new ArrayList<Enemy>();
-        for(Enemy e : enemies) {
-            e.locCalc = null;
-        }
     }
     void convertEnemiesToArray() {
         enemies.sort(new enemySpawnTimeSorter());

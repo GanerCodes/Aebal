@@ -423,7 +423,7 @@ void drawBubbles(PGraphics base) {
     bubbleLayer.filter(bubbleShader); //WHAT
 }
 
-class arrow {
+class arrow { //This is cancer
     float x, y, d1, d2, a, sz, mn, rot = PI, speed = 1;
     float oT = 0, oTV = 0;
     arrow(float x, float y, float d2, float sz, float mn) {
@@ -512,6 +512,7 @@ class floatingText {
 }
 
 void settings() {
+    msgList = new debugList(0, 0, 10000, 3000);
     settingsFileLoc = sketchPath("settings.json");
     try {
         assert sketchFile(settingsFileLoc).isFile();
@@ -549,9 +550,7 @@ void setup() {
     timerFormat = new DecimalFormat("##.####");
     timerFormat.setMinimumIntegerDigits(2);
     timerFormat.setMinimumFractionDigits(4);
-    msgList = new debugList(0, 0, 10000, 3000);
     
-
     minim = new Minim(this);
     soundList = new SFX[] {
         songSelChange = makeSFX("songSelChange.wav", -15),
@@ -569,9 +568,9 @@ void setup() {
     color setting_default_f_over = #FF0000;
     color setting_default_f_active = #FF9999;
 
-    sfxSlider = new vol_slider(gameWidth / 2, gameHeight / 1.175 + 50, 600, 35     , 0, -40, 20, "SFX", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
-    musicSlider = new music_slider(gameWidth / 2, gameHeight / 1.175 - 160, 600, 35, 0, -40, 20, "Music", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
-    difficultySlider = new difficulty_slider(1357, gameHeight * 4 / 5, 500, 35, songComplexity, 0.5, 1.1, "Difficulty", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
+    sfxSlider = new vol_slider(gameWidth / 2, gameHeight / 1.175 + 50, 600, 35     , -10, -40, 20, "SFX", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
+    musicSlider = new music_slider(gameWidth / 2, gameHeight / 1.175 - 160, 600, 35, -10, -40, 20, "Music", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
+    difficultySlider = new difficulty_slider(1357, gameHeight * 4 / 5, 500, 35, songComplexity, 0.3, 1.1, "Difficulty", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
     monitorOptions = new buttonMenu(165, 65, 200, 30, color(225), color(220), color(215), color(30), color(40), color(50));
     settings = new settingButton[] {
         DYNAMIC_BACKGROUND_COLOR = new settingButton(0, 0, 75, 75, 5, "Dynamic Background"  , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
@@ -622,7 +621,7 @@ void setup() {
     try {
         assert sketchFile(settingsFileLoc).isFile();
         menuSettings = loadJSONObject(settingsFileLoc);
-        for(settingButton b: settings) {
+        for(settingButton b : settings) {
             if(!menuSettings.isNull(b.txt)) {
                 b.state = menuSettings.getBoolean(b.txt);
             }
@@ -893,7 +892,7 @@ void draw() {
         case "game": {
             noScoreTimer -= (60 / frameRate);
             TT("Physics");
-            float time = gameMap.song.getTime();
+            float time = gameMap.song.getAdjustedTime();//gameMap.song.getTime();
             float durationComplete = gameMap.song.getTimeFraction();
             
             previousPos.set(pos.x, pos.y);
@@ -1125,7 +1124,18 @@ void draw() {
             fill(144, 200, 154);
             textSize(50);
             textAlign(LEFT, TOP);
-            text("Score: " + score + "\n\n" + gameMap.enemies.size() + '\n' + time + '\n' + gameMap.getIntensityIndex(time) + '\n' + gameMap.getIntensity(time) + '\n' + gameMap.getIntegralVal(gameMap.SPS *  time), 10, 0);
+            text("Score: " + score, 10, 0);
+            if(DEBUG_INFO.state) {
+                fill(255);
+                textSize(20);
+                text(
+                    format(
+                        "Time: %s\nPosition index: %s\nPosition offset: %s\nIntensity: %s\nEnemy count: %s",
+                        time, gameMap.getIntensityIndex(time),
+                        gameMap.getIntegralVal(gameMap.SPS * time),
+                        gameMap.getIntensity(time), gameMap.enemies.size()
+                    ), 12, 85);
+            }
 
             if(SHOW_SONG_NAME.state) {
                 fill(255, 200);

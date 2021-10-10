@@ -42,6 +42,7 @@ class debugList {
 
 void logmsg(String msg) {
     println("["+millis()+"] " + msg);
+    if(DEBUG_INFO == null || !DEBUG_INFO.state) return;
     String[] spl = msg.split("\n");
     for(int i = spl.length - 1; i >= 0; i--) {
         String s = spl[i];
