@@ -174,9 +174,9 @@ void loadSong() {
     mapGenerationText = "Loading";
     logmsg("Song complexity: " + str(songComplexity));
     try {
-        gameMap = new GameMap(gameSong.fileName, sketchPath("patterns.json"), screenSize, GAME_R);
+        gameMap = new GameMap(sketchPath(gameSong.fileName), sketchPath("patterns.json"), screenSize, GAME_R);
     }catch(Throwable t) {
-        logf("Error in song load! \"%s\"", t);
+        logf("Error in map generation! \"%s\"", t);
         mapGenerationText = "";
         setSceneDelay("gameSelect", 3500);
         fadeOpacityStart = 255;
