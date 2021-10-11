@@ -56,12 +56,19 @@ class GameMap {
                 if(indx == samples.length) break;
                 buffer[o] = samples[i * SAMPLES_PER_SECOND + o];
             }
-            complexityArr[i] = difficultySlider.val * findComplexity(buffer) * (1 + rootMeanSquare(buffer)) / 2;
+            complexityArr[i] = difficultySlider.val * variance(buffer) * (1 + rootMeanSquare(buffer)) / 2;
         }
     }
     void loadPatternFile() {
         setLoadingText("Loading patterns");
         spawner = new PatternSpawner(patternFileName);
+    }
+    void writeEnemiesToFile(String fileName) {
+        PrintWriter writer = createWriter(fileName);
+        writer.println(format("Random Seed: %s\nDifficulty: %s\nSong: %s\n\n\n", rng.seed, difficultySlider.val, song));
+        for(Enemy e : enemySpawns) {
+            writer.println(format("%s - %s", e.spawnInfo == null ? "Manual spawn" : e.spawnInfo, e));
+        }
     }
     GameMap(String songName, String patternFileName, PVector gameSize, RNG rng) {
         init(gameSize);
@@ -105,7 +112,7 @@ class GameMap {
             Enemy e = enemySpawns[spawnIndex];
             if(time < e.despawnTime && e.spawnTime > 0) {
                 enemies.add(e);
-                if(allowDebugActions && e.spawnInfo != null) logmsg("Spawned Enemy: " + e.spawnInfo);
+                if(LOG_ENEMY_SPAWNS && allowDebugActions && e.spawnInfo != null) logmsg("Spawned Enemy: " + e.spawnInfo);
             }
             spawnIndex++;
         }
@@ -156,7 +163,7 @@ class GameMap {
         float adv = average(complexityArr);
         for(int i = 0; i < complexityArr.length; i++) complexityArr[i] = pow(complexityArr[i] / (2.25 * adv), 1.5);
 
-        float totalComplexity = findComplexity(complexityArr);
+        float totalComplexity = variance(complexityArr);
         float adjDifficulty = map(difficultySlider.val, difficultySlider.val_min, difficultySlider.val_max, 0.1, 1);
 
         int iSec = int(complexityArr.length / songDuration);       //seconds -> intTime
@@ -252,19 +259,6 @@ class GameMap {
         }
         
         convertEnemiesToArray();
-    }
-    float findComplexity(float[] k) { //Variance calculation
-        float adv = 0;
-        for(int i = 0; i < k.length; i++) {
-            adv += k[i];
-        }
-        adv /= k.length;
-        float complexity = 0;
-        for(int i = 0; i < k.length; i++) {
-            complexity += abs(k[i] - adv);
-        }
-        complexity /= k.length;
-        return complexity;
     }
     void generateIntegral(float[] velArr, PVector gameSize) {
         integralArr = new float[velArr.length];

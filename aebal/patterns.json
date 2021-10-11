@@ -51,11 +51,11 @@
         "heavyBeat": {
             "triangle, square, circle": 45,
             "solidTriangle, solidSquare, solidCircle": 35,
-            "heart, hourglass, field": 20
+            "heart, hourglass, field, spiral": 20
         },
         "default": {
             "triangle, square, circle": 45,
-            "solidCircle, heart, hourglass": 30,
+            "solidCircle, heart, hourglass, spiral": 30,
             "field": 25
         }
     },
@@ -63,6 +63,7 @@
         "common": "linearRandomDirection",
         "field": "linearUp",
         "solidTriangle, solidCircle": "linearShrink",
+        "spiral": "90deg",
         "heart, triangle, circle": {
             "linearShrink": 0.55,
             "90deg": 0.3,
@@ -166,6 +167,14 @@
             "countBounds": "10, 20",
             "scaleBounds": "3",
             "distBounds": "0, 0.075"
+        },
+        "spiral": {
+            "equationX": "t / pi * cos(3 * t)",
+            "equationY": "t / pi * sin(3 * t)",
+            "distBounds": "0, 0.1",
+            "scaleBounds": "0.8, 1",
+            "countBounds": "15, 30",
+            "angleSweep": "0, 6.28318531"
         }
     },
     "velocity": {

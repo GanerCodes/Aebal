@@ -5,8 +5,9 @@ import java.util.Map;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
-boolean REFRESH_SONG_METADATA = false; //Recheck song metadata, even if found in cache
 boolean DO_ENEMY_SPAWNING = true;
+boolean LOG_ENEMY_SPAWNS = false;
+boolean DO_LOGGING = true;
 float TIMER_UPDATE_FREQUENCY = 500; //Debug timer update rate (millis)
 float BACKGROUND_COLOR_FADE = 0.275; //Lerp value
 float songComplexity = 0.5;
@@ -15,12 +16,12 @@ float GAME_MARGIN_SIZE = 25;
 float DEFAULT_SPEED = 7.5;
 int GAMESELECT_SONGDISPLAYCOUNT = 10; //How many songs in the Song Selector to display up and down
 int MAX_SIMULTANEOUS_DAMAGE = 100; //Mono got mad at the circles
-int SAMPLES_PER_SECOND = 1024;
+int SAMPLES_PER_SECOND = 1024; //Don't touch
 int gameWidth = 1920, gameHeight = 1080; //xdd
 
 GameMap gameMap;
 SFX hitSound, buttonSFX, textSFX, volChangeSFX, songSelChange, gainScore;
-PFont defaultFont, songFont;
+PFont defaultFont, songFont, monoFont;
 PGraphics back, loading_animation_buffer;
 boolean intense, allowDebugActions, cancerMode, keydown_SHIFT, checkTimes, songEndScreenSkippable, mouseOverSong, paused, show_fade_in = true;
 int previewFadeStartTime, nextAllowedSongPreviewTime, patternTestLocIndex, patternTestVelIndex, curX, curY, monitorID, cancerCount, score, hitCount, gameFrameCount, durationInto, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1, delayedSceneTimer = -1, clearEnemies = -1;
@@ -40,6 +41,7 @@ ArrayList<floatingText> floatingPrompts = new ArrayList();
 ArrayList<timingDisplayElement> orderedTimingDisplay = new ArrayList(); 
 HashMap<String, Long> timingList;
 HashMap<String, timingDisplayElement> timingDisplay;
+PrintWriter gameLogs;
 arrow a;
 debugList msgList;
 settingButton[] settings, settings_left, settings_right;
@@ -57,20 +59,6 @@ songElement gameSong, songPreview, previousSongPreview;
 final String SFX_PATH_PREFIX = "assets/SFX/";
 final float FIFTH_PI = 0.62831853071;
 final int[] cancerKeys = {UP, UP, DOWN, DOWN, LEFT, RIGHT, LEFT, RIGHT, 66, 65, ENTER};
-
-float findComplexity(float[] k) { //Variance calculation
-    float adv = 0;
-    for(int i = 0; i < k.length; i++) {
-        adv += k[i];
-    }
-    adv /= k.length;
-    float complexity = 0;
-    for(int i = 0; i < k.length; i++) {
-        complexity += abs(k[i] - adv);
-    }
-    complexity /= k.length;
-    return complexity;
-}
 
 int getOnScreenObjCount() {
     return gameMap.enemies.size();
@@ -176,11 +164,13 @@ void loadSong() {
     try {
         gameMap = new GameMap(sketchPath(gameSong.fileName), sketchPath("patterns.json"), screenSize, GAME_R);
     }catch(Throwable t) {
-        logf("Error in map generation! \"%s\"", t);
+        logf("Error in map generation! \"%s\"", t.getStackTrace());
         mapGenerationText = "";
         setSceneDelay("gameSelect", 3500);
         fadeOpacityStart = 255;
         fadeDuration = 500;
+        resetLevelBuffers();
+        return;
     }
     resetLevelBuffers();
     gameMap.song.setVol(musicSlider.val);
@@ -280,6 +270,7 @@ void playSongPreview() {
 }
 
 void selectLevel(songElement song) {
+    logf("Selected level: \"%s\"", song.fileName);
     switch(song.fileName) {
         case "///addSong": {
             selectInput("Select a music file:", "songSelected");
@@ -512,6 +503,8 @@ class floatingText {
 }
 
 void settings() {
+    if(DO_LOGGING) gameLogs = createWriter(sketchPath(format("logs/gameLog_%s_%s_%s-%s-%s-%s_%s.txt", year(), month(), day(), hour(), minute(), second(), System.currentTimeMillis())));
+    
     msgList = new debugList(0, 0, 10000, 3000);
     settingsFileLoc = sketchPath("settings.json");
     try {
@@ -538,6 +531,7 @@ void setup() {
         for(int i = 0; i < args.length; i++) {
             if(args[i].trim().toLowerCase().equals("debug")) {
                 allowDebugActions = true;
+                logf("Enabling debug actions.");
             }
         }
     }
@@ -662,6 +656,7 @@ void setup() {
 
     defaultFont = createFont(sketchPath("assets/fonts/defaultFont.ttf"), 128);
     songFont = createFont(sketchPath("assets/fonts/songFont.ttf"), 64);
+    monoFont = createFont(sketchPath("assets/fonts/monoFont.ttf"), 64);
 
     a = new arrow(gameWidth / 2, gameHeight / 2, 0, 500, 1700);
     back = createGraphics(gameWidth, gameHeight, P2D);
@@ -1053,7 +1048,7 @@ void draw() {
             
             //post processing
             if(DO_POST_PROCESSING.state) {
-                TT("PostProcessing");
+                TT("Post Processing");
                 bloom.set("bloom_intensity", 1.5 * c / 81.0);
                 if(intense) {
                     bloom.set("saturation", 1 + c / 5.0);
@@ -1061,7 +1056,7 @@ void draw() {
                     bloom.set("saturation", 1.0);
                 }
                 filter(bloom);
-                TT("PostProcessing");
+                TT("Post Processing");
             }
             if(DO_CHROMA.state) {
                 TT("ChromaAbbr");
@@ -1127,7 +1122,7 @@ void draw() {
             text("Score: " + score, 10, 0);
             if(DEBUG_INFO.state) {
                 fill(255);
-                textSize(20);
+                textFont(monoFont, 20);
                 text(
                     format(
                         "Time: %s\nPosition index: %s\nPosition offset: %s\nIntensity: %s\nEnemy count: %s",
@@ -1338,8 +1333,8 @@ void draw() {
             noStroke();
             rectMode(CORNER);
             if(orderedTimingDisplay.size() > 0) {
-                rect(gameWidth - timing_rectWidth - timing_rightPadding, timing_topPadding, timing_rectWidth, timing_rectHeight);
-                textFont(defaultFont, timing_textFontSize);
+                rect(gameWidth - timing_rectWidth - timing_rightPadding, timing_topPadding, timing_rectWidth, timing_rectHeight, 4);
+                textFont(monoFont, timing_textFontSize);
                 fill(255);
                 int i = 0;
                 for(timingDisplayElement e : orderedTimingDisplay) {
@@ -1353,7 +1348,7 @@ void draw() {
             }
         }
         
-        textFont(defaultFont, 15);
+        textFont(monoFont, 15);
         if(DEBUG_INFO.state) { //Debug log
             msgList.x = gameWidth - 8;
             msgList.y = timing_y;
@@ -1364,15 +1359,15 @@ void draw() {
             rectMode(CORNER);
             noStroke();
             fill(25, 128);
-            rect(gameWidth - 73, 2, 67, 35, 3);
+            rect(gameWidth - 81, 2, 79, 34, 3);
             float warnIntensity = clampMap(fps_tracker, 0, 120, 0, 255);
             fill(255, warnIntensity, warnIntensity);
             textAlign(LEFT, BOTTOM);
-            textFont(defaultFont, 15);
+            textFont(monoFont, 15);
             textLeading(15);
             gameFrameCount++;
             gameFrameRateTotal += frameRate;
-            text("FPS: " + nf(min(999, round(fps_tracker)), 3) + "\nAdv: " + nf(min(999, round(gameFrameRateTotal / gameFrameCount)), 3), gameWidth - 70, 35);
+            text("FPS: " + nf(min(999, round(fps_tracker)), 3) + "\nAdv: " + nf(min(999, round(gameFrameRateTotal / gameFrameCount)), 3), gameWidth - 78, 35);
             fps_tracker = lerp(fps_tracker, frameRate, 1 / frameRate);
         }
         TT("Debug Overlays");
@@ -1421,6 +1416,10 @@ void exit() {
     }
     menuSettings.setInt("monitorID", monitorID);
     saveJSONObject(menuSettings, settingsFileLoc);
+    if(DO_LOGGING) {
+        gameLogs.flush();
+        gameLogs.close();
+    }
     super.exit();
 }
 
@@ -1477,11 +1476,11 @@ void keyPressed(KeyEvent e) {
                     case LEFT: {
                         gameMap.song.skip(-15 * 1000);
                         gameMap.resetEnemiesWithIndex();
-                        logmsg("Rewinded 15 seconds");
+                        logf("Rewinded 15 seconds. Time: %ss", gameMap.song.getTime());
                     } break;
                     case RIGHT: {
-                        gameMap.song.skip( 15 * 1000);
-                        logmsg("Fowarded 15 seconds");
+                        gameMap.song.skip(15 * 1000);
+                        logf("Fowarded 15 seconds. Time: %ss", gameMap.song.getTime());
                     } break;
                     default: {
                         switch(key) {
@@ -1499,6 +1498,11 @@ void keyPressed(KeyEvent e) {
                                 gameMap.loadPatternFile();
                                 logmsg("Reset enemy spawns and reloaded pattern file.");
                             } break;
+                            case 'y': {
+                                String fileName = sketchFile("logs/Map_Info_" + System.currentTimeMillis() + ".txt").toString();
+                                gameMap.writeEnemiesToFile(fileName);
+                                logf("Exported Enemy data to \"%s\"", fileName);
+                            }
                             default: {
                                 String[] currentIndices = new String[] {
                                     gameMap.spawner.locations.get (patternTestLocIndex).ID,

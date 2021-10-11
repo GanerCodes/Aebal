@@ -2,6 +2,7 @@
 aebal/settings.json
 aebal/songData.json
 aebal/songs/*
+aebal/logs/*
 aebal.zip
 aebalExport
 integralSpawning/data/*.mp3

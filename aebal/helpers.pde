@@ -247,11 +247,6 @@ float roundArbitrary(float v, float r) {
     return r * round(v / r);
 }
 
-float rootMeanSquare(float[] vals) {
-    float r = 0;
-    for(int i = 0; i < vals.length; i++) r += sq(vals[i]);
-    return sqrt(r / vals.length);
-}
 float sum(float[] vals) {
     float r = 0;
     for(float v : vals) r += v;
@@ -259,6 +254,20 @@ float sum(float[] vals) {
 }
 float average(float[] vals) {
     return sum(vals) / vals.length;
+}
+float variance(float[] vals) { //Variance calculation
+    float adv = average(vals);
+    float complexity = 0;
+    for(int i = 0; i < vals.length; i++) {
+        complexity += abs(vals[i] - adv);
+    }
+    complexity /= vals.length;
+    return complexity;
+}
+float rootMeanSquare(float[] vals) {
+    float r = 0;
+    for(int i = 0; i < vals.length; i++) r += sq(vals[i]);
+    return sqrt(r / vals.length);
 }
 float[] accumulate(float[] vals) {
     if(vals.length <= 1) return vals;

@@ -35,6 +35,9 @@ abstract class Sound {
     abstract void pause();
     abstract int position();
     abstract int length();
+    String toString() {
+        return soundName;
+    }
 }
 
 class SFX extends Sound {
@@ -78,7 +81,7 @@ class SFX extends Sound {
 }
 
 class Music extends Sound {
-    int previousSongPosition, previousTime;
+    int previousSongPosition = -1, previousTime = -1;
     AudioPlayer sound;
     Music(String soundName, float defaultVolume) {
         super(soundName, defaultVolume);
