@@ -55,8 +55,9 @@
         },
         "default": {
             "triangle, square, circle": 45,
-            "solidCircle, heart, hourglass, spiral": 30,
-            "field": 25
+            "solidCircle, heart, hourglass": 30,
+            "field": 25,
+            "spiral": 18
         }
     },
     "locVelMap": {
@@ -173,7 +174,8 @@
             "equationY": "t / pi * sin(3 * t)",
             "distBounds": "0, 0.1",
             "scaleBounds": "0.8, 1",
-            "countBounds": "15, 30",
+            "countBounds": "12, 25",
+            "speedBounds": "0.6, 0.85",
             "angleSweep": "0, 6.28318531"
         }
     },

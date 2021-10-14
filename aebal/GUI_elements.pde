@@ -248,15 +248,17 @@ class difficulty_slider extends slider {
         clr_ball_hover  = mulColor(clr_line_hover , vec3(0.65));
         clr_ball_active = mulColor(clr_line_active, vec3(0.65));
         int displayVal = int(n * 100);
-        if(displayVal < 35) {
-            txt = "Difficulty\nEasy ("+displayVal+"%)";
-        }else if(displayVal < 60) {
-            txt = "Difficulty\nMedium ("+displayVal+"%)";
-        }else if(displayVal < 90) {
-            txt = "Difficulty\nHard ("+displayVal+"%)";
+        txt = "Difficulty\n";
+        if(displayVal < 25) {
+            txt += "Easy";
+        }else if(displayVal < 50) {
+            txt += "Medium";
+        }else if(displayVal < 85) {
+            txt += "Hard";
         }else{
-            txt = "Difficulty\nImpossible ("+displayVal+"%)"; 
+            txt += "Impossible";
         }
+        txt += " ("+displayVal+"%)";
     }
     void onRelease() {
         onChange();

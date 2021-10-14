@@ -8,6 +8,7 @@ import java.nio.file.Paths;
 boolean DO_ENEMY_SPAWNING = true;
 boolean LOG_ENEMY_SPAWNS = false;
 boolean DO_LOGGING = true;
+float DEFAULT_SONG_GAIN = -13.5;
 float TIMER_UPDATE_FREQUENCY = 500; //Debug timer update rate (millis)
 float BACKGROUND_COLOR_FADE = 0.275; //Lerp value
 float songComplexity = 0.5;
@@ -192,6 +193,7 @@ void setSFXvol(float vol) {
 void setMusicvol(float vol) {
     if(vol == musicSlider.val_min) vol = -10000;
     if(gameMap != null && gameMap.song.isLoaded()) gameMap.song.setVol(vol);
+    setSongPreviewVol();
 }
 
 void fadeBack(float mul, int opacity) {
@@ -252,7 +254,11 @@ String fileName(String path) {
     return new File(path).getName().replaceFirst("[.][^.]+$", "");
 }
 
-
+void setSongPreviewVol() {
+    if(songPreview != null && songPreview.music != null) {
+        songPreview.music.setVol(lerp(musicSlider.val, musicSlider.val_min, 0.75));
+    }
+}
 void stopSongPreview() {
     songPreview.music.stop();
 }
@@ -260,12 +266,11 @@ void playSongPreview() {
     if(previousSongPreview != null && previousSongPreview.music != null && previousSongPreview.music.isPlaying()) {
         previousSongPreview.music.pause();
     }
-    float newVol = lerp(musicSlider.val, musicSlider.val_min, 0.80);
-    songPreview.music.setVol(newVol);
+    setSongPreviewVol();
     songPreview.setCueToLoopStart();
     songPreview.music.sound.loop(0);
     
-    songPreview.music.sound.shiftGain(-80, newVol, 1000);
+    songPreview.music.sound.shiftGain(-80, songPreview.music.volume, 1000);
     previewFadeStartTime = millis();
 }
 
@@ -321,7 +326,7 @@ class songElement {
     songElement(String fileName) {
         this.fileName = fileName;
         this.title = fileName(fileName);
-        this.music = new Music(fileName, 0);
+        this.music = new Music(fileName, DEFAULT_SONG_GAIN);
         resetLoopPoints();
         AudioMetaData metadata = music.sound.getMetaData();
         if(metadata.author() != null) author = metadata.author();
@@ -564,7 +569,7 @@ void setup() {
 
     sfxSlider = new vol_slider(gameWidth / 2, gameHeight / 1.175 + 50, 600, 35     , -10, -40, 20, "SFX", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
     musicSlider = new music_slider(gameWidth / 2, gameHeight / 1.175 - 160, 600, 35, -10, -40, 20, "Music", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
-    difficultySlider = new difficulty_slider(1357, gameHeight * 4 / 5, 500, 35, songComplexity, 0.3, 1.1, "Difficulty", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
+    difficultySlider = new difficulty_slider(1357, gameHeight * 4 / 5, 500, 35, songComplexity, 0.1, 1.1, "Difficulty", #3333CC, #3355CC, #2222DD, #2266DD, #1111FF, #1177FF);
     monitorOptions = new buttonMenu(165, 65, 200, 30, color(225), color(220), color(215), color(30), color(40), color(50));
     settings = new settingButton[] {
         DYNAMIC_BACKGROUND_COLOR = new settingButton(0, 0, 75, 75, 5, "Dynamic Background"  , setting_default_t, setting_default_t_over, setting_default_t_active, setting_default_f, setting_default_f_over, setting_default_f_active),
@@ -980,7 +985,7 @@ void draw() {
                     back.noFill();
                     if(dist(previousPos.x, previousPos.y, pos.x, pos.y) > 0) {
                         prevTrailLoc = trailLoc;
-                        trailLoc = new PVector(pos.x, pos.y);
+                        trailLoc = pos.copy();
 
                         float d = dist(prevTrailLoc.x, prevTrailLoc.y, trailLoc.x, trailLoc.y);
                         d /= (2.25 + max(0, (60 - d) / 60));
@@ -1009,6 +1014,8 @@ void draw() {
                         back.strokeCap(SQUARE);
                         back.bezier(prevTrailLoc.x, prevTrailLoc.y, newMiddle.x, newMiddle.y, closeMargin.x, closeMargin.y, trailLoc.x, trailLoc.y);
                         back.strokeCap(PROJECT);
+                    }else{
+                        trailLoc = pos.copy();
                     }
                 }else{
                     back.strokeWeight(5);

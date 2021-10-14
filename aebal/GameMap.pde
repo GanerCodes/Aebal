@@ -76,7 +76,7 @@ class GameMap {
         this.patternFileName = patternFileName;
         this.rng = rng;
 
-        song = new Music(songName, -20.0);
+        song = new Music(songName, DEFAULT_SONG_GAIN);
         setLoadingText("Loading song");
         prepareSong(minim.loadSample(songName));
         loadPatternFile();
