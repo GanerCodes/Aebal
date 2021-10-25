@@ -12,9 +12,9 @@ float DEFAULT_SONG_GAIN = -13.5;
 float TIMER_UPDATE_FREQUENCY = 500; //Debug timer update rate (millis)
 float BACKGROUND_COLOR_FADE = 0.275; //Lerp value
 float songComplexity = 0.5;
-float FPS = 1000; //Wish I could uncap this
 float GAME_MARGIN_SIZE = 25;
 float DEFAULT_SPEED = 7.5;
+int FPS = 1000; //Wish I could uncap this
 int GAMESELECT_SONGDISPLAYCOUNT = 10; //How many songs in the Song Selector to display up and down
 int MAX_SIMULTANEOUS_DAMAGE = 100; //Mono got mad at the circles
 int SAMPLES_PER_SECOND = 1024; //Don't touch
@@ -25,7 +25,7 @@ SFX hitSound, buttonSFX, textSFX, volChangeSFX, songSelChange, gainScore;
 PFont defaultFont, songFont, monoFont;
 PGraphics back, loading_animation_buffer;
 boolean intense, allowDebugActions, cancerMode, keydown_SHIFT, checkTimes, songEndScreenSkippable, mouseOverSong, paused, show_fade_in = true;
-int previewFadeStartTime, nextAllowedSongPreviewTime, patternTestLocIndex, patternTestVelIndex, curX, curY, monitorID, cancerCount, score, hitCount, gameFrameCount, durationInto, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1, delayedSceneTimer = -1, clearEnemies = -1;
+int currentFrameRate, previewFadeStartTime, nextAllowedSongPreviewTime, patternTestLocIndex, patternTestVelIndex, curX, curY, monitorID, cancerCount, score, hitCount, gameFrameCount, durationInto, levelSummary_timer, activeCursor = ARROW, deltaMillisStart, gameSelect_songSelect_actual, previousCursor = -1, delayedSceneTimer = -1, clearEnemies = -1;
 float songPreviewLevel, gameFrameRateTotal, nextFadeTime, scrollWait, fps_tracker, gameSelect_songSelect, gameSelectExtraYOffset, sceneOffsetMillis, c, adv, count, objSpawnTimer, ang, noScoreTimer, millisDelta, fadeDuration = 5000, fadeOpacityStart = 400, fadeOpacityEnd = 0, grayScaleTimer = 100, trailingAngle = 0, trailStrokeWeight = 4.5;
 String mapGenerationText, delayedSceneScene, settingsFileLoc, previousScene, gameState = "title";
 RNG GFX_R, GAME_R;
@@ -135,25 +135,25 @@ void updateMonitorOptions() {
     }
 }
 
-void pause(boolean setFPS) {
+void pause() {
+    logf("paused");
     paused = true;
     if(gameState.equals("game")) {
         if(gameMap.song.isPlaying()) {
             deltaMillisStart = millis();
             gameMap.song.pause();
-            if(setFPS) frameRate(120);
         }
     }
     return;
 }
 
-void unpause(boolean setFPS) {
+void unpause() {
+    logf("Unpause");
     paused = false;
     if(gameState.equals("game")) {
-        if(!gameMap.song.isPlaying() && gameMap.song.position() < gameMap.song.length()) {
+        if(gameMap != null && gameMap.song != null && !gameMap.song.isPlaying() && gameMap.song.position() < gameMap.song.length()) {
             millisDelta -= deltaMillisStart - millis(); //Subtract missed time from new adjMillis
             gameMap.song.unpause();
-            if(setFPS) frameRate(FPS);
         }
     }
 }
@@ -317,7 +317,8 @@ float adjMillis() {
 }
 
 class songElement {
-    String author, duration, title, fileName;
+    String author, duration, title, fileName, extraInfo;
+    boolean showTitle = true;
     Music music;
     songElement(String fileName, String title) {
         this.fileName = fileName;
@@ -356,8 +357,12 @@ void initializeSongs() {
             logmsg("Song unreadable: " + songName);
         }
     }
-    songList.add(new songElement("///addSong", "+ Add Song"));
-    songList.add(new songElement("///download", "+ Youtube-dl [Clipboard]"));
+    songElement songAdd, songDownload;
+    songList.add(songAdd      = new songElement("///addSong", "+ Add Song"));
+    songList.add(songDownload = new songElement("///download", "+ Youtube-dl [Clipboard]"));
+
+    songDownload.extraInfo = "Make sure Youtube-DL is installed";
+    songDownload.showTitle = false;
 
     gameSelect_songSelect_actual = songList.size() / 2;
     gameSelect_songSelect = gameSelect_songSelect_actual;
@@ -530,6 +535,7 @@ void settings() {
 PGraphics intensityGraph;
 void setup() {
     frameRate(FPS);
+    currentFrameRate = FPS;
     surface.setTitle("Aebal");
 
     if(args != null && args.length > 0) {
@@ -691,11 +697,15 @@ void setup() {
 }
 
 void draw() {
-    if(focused || gameState.equals("title")) {
-        if(paused) unpause(true);
-    }else{
-        if(!paused) pause(true);
-        return;
+    int newFPS = focused ? FPS : 111;
+    if(currentFrameRate != newFPS) {
+        frameRate(newFPS);
+        currentFrameRate = newFPS;
+    }
+    
+    if(!focused && !paused) {
+        pause();
+        gameState = "pause";
     }
 
     durationInto = int(adjMillis() - sceneOffsetMillis);
@@ -831,7 +841,7 @@ void draw() {
                                 gameWidth / 2 - sw - 55, 250 + y_offset + 6.75 - 20,
                                 gameWidth / 2 - sw - 55, 250 + y_offset + 6.75 + 20);
 
-                            if(i != songList.size() - 1) {
+                            if(i < songList.size()) {
                                 if(songPreview != currentElement) {
                                     if(millis() > nextAllowedSongPreviewTime) {
                                         previousSongPreview = songPreview;
@@ -856,8 +866,8 @@ void draw() {
                                 for(int tmp = 0; tmp < newlineCountShort; tmp++) {
                                     newLines += '\n';
                                 }
-                                String detailsLeft = "Title:" + newLines;
-                                String detailsRight = songTitleShort;
+                                String detailsLeft = currentElement.showTitle ? ("Title:" + newLines) : "";
+                                String detailsRight = currentElement.showTitle ? songTitleShort : "";
                                 if(currentElement.author != null && currentElement.author.length() > 0) {
                                     detailsLeft += "\nArtist:";
                                     detailsRight += '\n' + currentElement.author;
@@ -865,6 +875,10 @@ void draw() {
                                 if(currentElement.duration != null && currentElement.duration.length() > 0) {
                                     detailsLeft += "\nDuration:";
                                     detailsRight += '\n' + currentElement.duration;
+                                }
+                                if(currentElement.extraInfo != null && currentElement.extraInfo.length() > 0) {
+                                    detailsRight += "\n";
+                                    detailsLeft += currentElement.extraInfo + '\n';
                                 }
 
                                 text(detailsLeft, gameWidth / 2 + descSize / 2 - tx, gameHeight * 1 / 4 + 3 - ty);
@@ -1250,15 +1264,22 @@ void draw() {
             loading_animation_buffer.filter(loading_animation);
             image(loading_animation_buffer, gameWidth / 2, 1.75 / 3.0 * gameHeight);
             String message;
-            if(songDownloadProcess.finished) {
+            if(songDownloadProcess == null || songDownloadProcess.finished) {
                 if(delayedSceneTimer == -1) {
                     setSceneDelay("gameSelect", 2500);
                     fadeOpacityStart = 255;
+                    
                     fadeDuration = 500;
-                    if(songDownloadProcess.code != 0) logmsg("Download error: " + songDownloadProcess.toString());
+                    if(songDownloadProcess == null || songDownloadProcess.code != 0) {
+                        logmsg("Download error: " + (songDownloadProcess == null ? "null" : songDownloadProcess.toString()));
+                    }
                 }
-                message = songDownloadProcess.code == 0 ? "Downloaded!" : "Error";
-                initializeSongs();
+                if(songDownloadProcess == null || songDownloadProcess.code != 0) {
+                    message = "Error";
+                }else{
+                    message = "Downloaded!";
+                    initializeSongs();
+                }
             }else{
                 message = "Downloading." + (".....".substring(5 - (int(millis() / 1000.0) % 5)));
             }
@@ -1443,14 +1464,14 @@ void keyPressed(KeyEvent e) {
         }else{
             switch(gameState) {
                 case "game": {
-                    pause(false);
+                    pause();
                     screenshot();
                     setScene("pause");
                 } break;
                 case "pause": {
                     setScene("game");
                     screenshot();
-                    unpause(false);
+                    unpause();
                 } break;
                 case "settings": {
                     screenshot();
@@ -1593,7 +1614,7 @@ void mouseReleased() {
             screenshot();
             setScene("settings");
             updateMonitorOptions();
-            unpause(false);
+            unpause();
         }
     }
     switch(gameState) {

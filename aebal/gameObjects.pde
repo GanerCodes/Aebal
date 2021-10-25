@@ -4,6 +4,7 @@ class Enemy {
     float spawnTime, despawnTime, velOffset;
     String spawnInfo;
     GameMap gameMap;
+    boolean isGift = false;
     Enemy(GameMap gameMap, PVector loc, PVector vel, float spawnTime, float despawnTime) {
         this(loc, vel);
         init(gameMap, spawnTime, despawnTime);
@@ -21,11 +22,13 @@ class Enemy {
     PVector getLoc(float time) {
         float tt = time * gameMap.SPS;
         float calculatedDist = lerp(gameMap.getIntegralVal(floor(tt)), gameMap.getIntegralVal(ceil(tt)), tt - int(tt)) - velOffset;
-        // float calculatedDist = gameMap.getIntegralVal(tt) - velOffset;
         return PVector.add(loc, PVector.mult(vel, calculatedDist));
     }
     void resetEnemyTrail() {
         locCalc = null;
+    }
+    void touchAction(float time) {
+        gotHit(getOnScreenObjCount(), 30, 1, time);
     }
     void update(PGraphics base, float time, PVector pos, PVector previousPos, color enemyColor, boolean fancy) {
         PVector currentLoc = getLoc(time);
@@ -42,7 +45,7 @@ class Enemy {
             squareIntersection(pos       , 35, locCalc, currentLoc) ||
             quadLineSquareIntersection(previousPos, pos, locCalc, currentLoc, 17.5)
         )) {
-            gotHit(getOnScreenObjCount(), 30, 1, time);
+            touchAction(time);
         }
         locCalc = currentLoc;
     }
@@ -55,6 +58,17 @@ class Enemy {
     }
     String toString() {
         return String.format("Pos: (%f, %f), Vel: (%f, %f), ExistTime: [%fs - %fs]", loc.x, loc.y, vel.x, vel.y, spawnTime, despawnTime);
+    }
+}
+class GiftEnemy extends Enemy {
+    GiftEnemy(GameMap gameMap, PVector loc, PVector vel, float spawnTime, float despawnTime) {
+        super(gameMap, loc, vel, spawnTime, despawnTime);
+    }
+    GiftEnemy(PVector loc, PVector vel) {
+        super(loc, vel);
+    }
+    void touchAction(float time) {
+        score += int(getOnScreenObjCount() / 4);
     }
 }
 

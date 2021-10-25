@@ -58,19 +58,23 @@ asyncSubprocess subprocessAsync(String[] cmd, String directory) {
 }
 
 asyncSubprocess tryDownloadFromClipboard() {
-    asyncSubprocess p = subprocessAsync(new String[] {"youtube-dl", "-h"});
-    while(!p.finished) {}
-    if(p.output.length() > 100) { //Janky way to check if user has youtube-dl installed
-        try {
-            String URL = (String) Toolkit.getDefaultToolkit().getSystemClipboard().getData(DataFlavor.stringFlavor);
-            if(URL == null || URL.length() < 5) return null;
-            logmsg(String.format("Downloading URL \"%s\"", URL));
-            p = subprocessAsync(new String[] {"youtube-dl", "--add-metadata", "--extract-audio", "--embed-thumbnail", "--no-playlist", "--audio-format", "mp3", "--output", "%(title)s.%(ext)s", URL}, sketchPath("songs"));
-            return p;
-        } catch(Throwable t) {
+    try {
+        asyncSubprocess p = subprocessAsync(new String[] {"youtube-dl", "-h"});
+        while(!p.finished) {}
+        if(p.output.length() > 100) { //Janky way to check if user has youtube-dl installed
+            try {
+                String URL = (String) Toolkit.getDefaultToolkit().getSystemClipboard().getData(DataFlavor.stringFlavor);
+                if(URL == null || URL.length() < 5) return null;
+                logmsg(String.format("Downloading URL \"%s\"", URL));
+                p = subprocessAsync(new String[] {"youtube-dl", "--add-metadata", "--extract-audio", "--embed-thumbnail", "--no-playlist", "--audio-format", "mp3", "--output", "%(title)s.%(ext)s", URL}, sketchPath("songs"));
+                return p;
+            } catch(Throwable t) {
+                return null;
+            }
+        }else{
             return null;
         }
-    }else{
+    }catch(Throwable t) {
         return null;
     }
 }

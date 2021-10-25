@@ -321,6 +321,7 @@ class GameMap {
         field.draw(base, pos, mouseX, mouseY);
     }
     void drawEnemies(PGraphics base, float time, PVector pos, PVector previousPos, color enemyColor, boolean fancy) {
+        color green = color(0, 255, 0);
         if(fancy) {
             base.strokeCap(SQUARE);
             base.strokeWeight(20);
@@ -329,13 +330,20 @@ class GameMap {
             base.beginShape(LINES);
         }
         for(Enemy e : enemies) {
-            e.update(base, time, pos, previousPos, enemyColor, fancy);
+            if(!e.isGift) e.update(base, time, pos, previousPos, enemyColor, fancy);
         }
-        if(fancy) base.endShape();
-        
-        base.noStroke();
-        base.fill(enemyColor);
+        if(fancy) {
+            base.endShape();
+            base.stroke(green);
+        }
         for(Enemy e : enemies) {
+            if(e.isGift) e.update(base, time, pos, previousPos, enemyColor, fancy);
+        }
+        base.endShape();
+
+        base.noStroke();
+        for(Enemy e : enemies) {
+            base.fill(e.isGift ? green : enemyColor);
             base.circle(e.locCalc.x, e.locCalc.y, 20);
         }
     }
