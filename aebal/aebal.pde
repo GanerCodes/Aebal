@@ -703,7 +703,7 @@ void draw() {
         currentFrameRate = newFPS;
     }
     
-    if(!focused && !paused) {
+    if(!focused && !paused && !gameState.equals("load_download")) {
         pause();
         gameState = "pause";
     }
