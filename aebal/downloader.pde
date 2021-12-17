@@ -59,14 +59,15 @@ asyncSubprocess subprocessAsync(String[] cmd, String directory) {
 
 asyncSubprocess tryDownloadFromClipboard() {
     try {
-        asyncSubprocess p = subprocessAsync(new String[] {"youtube-dl", "-h"});
+        String yt_dl_cmd = "yt-dlp";
+        asyncSubprocess p = subprocessAsync(new String[] {yt_dl_cmd, "-h"});
         while(!p.finished) {}
         if(p.output.length() > 100) { //Janky way to check if user has youtube-dl installed
             try {
                 String URL = (String) Toolkit.getDefaultToolkit().getSystemClipboard().getData(DataFlavor.stringFlavor);
                 if(URL == null || URL.length() < 5) return null;
                 logmsg(String.format("Downloading URL \"%s\"", URL));
-                p = subprocessAsync(new String[] {"youtube-dl", "--add-metadata", "--extract-audio", "--embed-thumbnail", "--no-playlist", "--audio-format", "mp3", "--output", "%(title)s.%(ext)s", URL}, sketchPath("songs"));
+                p = subprocessAsync(new String[] {yt_dl_cmd, "--add-metadata", "--extract-audio", "--embed-thumbnail", "--no-playlist", "--audio-format", "mp3", "--output", "%(title)s.%(ext)s", URL}, sketchPath("songs"));
                 return p;
             } catch(Throwable t) {
                 return null;
